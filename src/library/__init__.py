@@ -1,12 +1,14 @@
 # dep
 
-from .data    import Tags, Meta
+from .data    import Tags, TagsInput, TagUtil, Meta
 from .library import Book, Library
+from .util    import JSONFile
 
 
 # export
 
 __all__ = [
-    Tags, Meta,
-    Book, Library
+    'Tags', 'TagsInput', 'TagUtil', 'Meta',
+    'Book', 'Library',
+    'JSONFile'
 ]

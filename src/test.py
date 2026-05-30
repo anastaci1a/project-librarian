@@ -1,22 +1,47 @@
 # dep
 
-from library.data import tags_combine
+from library import *
 
 
 # tests
 
 def test_tags():
-    # expected:
-    # {"Category": {"Web", "Mobile", "Package"}, "Language": {"Typescript", "HTML", "Kotlin", "Java"}}
+    print("TAG TEST")
 
-    print(tags_combine(
-        {"Category": {"Package"}, "Language": {"Java"}},
-        {"Category": {"Mobile"}, "Language": {"Kotlin"}},
-        {"Category": {"Web"}, "Language": {"HTML", "Typescript"}}
-    ))
+    combined_immut = TagUtil.combine(
+            {"Category": {"Package"}, "Language": {"Java"}},
+            {"Category": {"Mobile"}, "Language": {"Kotlin"}},
+            {"Category": {"Web"}, "Language": {"HTML", "Typescript"}}
+    )
+    print("1:", TagUtil.serialize(combined_immut))
+    # expected: {"Category": {"Mobile", "Package", "Web"}, "Language": {"HTML", "Java", "Kotlin", "Typescript"}}
+
+def test_meta():
+    print("META TEST")
+
+    meta = Meta(tags={"Status": {"Inactive"}})
+    print("1:", meta)
+    # expected: Meta(name="Untitled", ..., tags: Mapping[str, frozenset[str]], ...)
+
+    meta_dict = meta.to_dict()
+    print("2:", meta_dict)
+    # expected: {"name": "Untitled", ..., "tags": dict[str, list[str]], ...}
+
+    JSONFile.write("./test.json.temp", meta_dict)
+    meta_dict_fromfile = JSONFile.read("./test.json.temp")
+    print("3:", meta_dict_fromfile)
+    # expected: {"name": "Untitled", ..., "tags": dict[str, list[str]], ...}
+
+    meta_fromfile = meta.from_dict(meta_dict_fromfile)
+    print("4:", meta_fromfile)
+    # expected: Meta(name="Untitled", ..., tags: Mapping[str, frozenset[str]], ...)
+
+    print("5:", meta == meta_fromfile)
+    # expected: True
 
 
 # main
 
 if __name__ == "__main__":
-    test_tags()
+    test_tags(); print()
+    test_meta()

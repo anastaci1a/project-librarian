@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from enum   import Enum
 from os     import PathLike
+from pathlib import Path
 from typing import Any
 
 import json
@@ -13,11 +14,12 @@ import json
 
 BOX_CHARS_DEFAULT = "─│╭╮╰╯"
 
+type PathSchema = str | PathLike[str]
 
 # json
 
 class JSONFile:
-    class ImmutEncoder(json.JSONEncoder):
+    class _ImmutEncoder(json.JSONEncoder):
         def default(self, o):
             if isinstance(o, set):
                 return list(o)
@@ -25,24 +27,28 @@ class JSONFile:
                 return super().default(o)
 
     @staticmethod
-    def write_dumps(
-            outfile: str | PathLike[str],
-            json_serializable: Any,
-            indent    = 4,
-            sort_keys = False
+    def write(
+            outfile:            PathSchema,
+            json_serializable:  Any,
+            create_parent_dirs: bool = True,
+            indent:             int  = 2,
+            sort_keys:          bool = False
     ) -> str:
+        path = Path(outfile)
+        if create_parent_dirs:
+            path.parent.mkdir(parents=True, exist_ok=True)
         json_str = json.dumps(
             json_serializable,
             indent=indent,
             sort_keys=sort_keys,
-            cls=JSONFile.ImmutEncoder
+            cls=JSONFile._ImmutEncoder
         )
-        with open(outfile, "w") as file:
+        with open(path, "w") as file:
             file.write(json_str)
         return json_str
 
     @staticmethod
-    def loads(infile: str | PathLike[str]) -> Any:
+    def read(infile: PathSchema) -> Any:
         with open(infile, "r") as file:
             json_str = "".join(file.readlines())
         return json.loads(json_str)
