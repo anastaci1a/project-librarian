@@ -27,8 +27,9 @@ def test_meta():
     print("2:", meta_dict)
     # expected: {"name": "Untitled", ..., "tags": dict[str, list[str]], ...}
 
-    JSONFile.write("./test.json.temp", meta_dict)
-    meta_dict_fromfile = JSONFile.read("./test.json.temp")
+    testfile = "./test.temp.json"
+    JSONFile.write(testfile, meta_dict)
+    meta_dict_fromfile = JSONFile.read(testfile)
     print("3:", meta_dict_fromfile)
     # expected: {"name": "Untitled", ..., "tags": dict[str, list[str]], ...}
 

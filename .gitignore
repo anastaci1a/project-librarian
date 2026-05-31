@@ -1,4 +1,4 @@
 /.idea/
 **/*.iml
-**/*.temp
+**/*.temp.*
 **/__pycache__/

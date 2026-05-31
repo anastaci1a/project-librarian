@@ -48,11 +48,11 @@ class Meta:
 
     name:          str              = "Untitled"
     description:   str              = ""
-    tags:          Tags | TagsInput = field(default_factory=Mapping)
+    tags:          Tags | TagsInput = field(default_factory=dict)
     date_created:  datetime         = field(default_factory=datetime.now)
     date_modified: datetime         = field(default_factory=datetime.now)
-    path:          Path | None      = None
-    icon:          Path | None      = None
+    path_root:     Path | None      = None
+    path_icon:     Path | None      = None
 
     # freeze tags
 
@@ -76,7 +76,7 @@ class Meta:
 
     def to_dict(self) -> dict:
         data = self.__dict__.copy()
-        for k in ("path", "icon", "date_created", "date_modified"):
+        for k in ("date_created", "date_modified", "path_root", "path_icon"):
             data[k] = str(data.get(k))
         data["tags"] = TagUtil.serialize(data["tags"])
 
@@ -94,8 +94,8 @@ class Meta:
             tags:          Any = None,
             date_created:  Any = None,
             date_modified: Any = None,
-            path:          Any = None,
-            icon:          Any = None,
+            path_root:     Any = None,
+            path_icon:     Any = None,
 
             **kwargs: Any # allow but ignore extraneous args
     ) -> Meta:
@@ -107,7 +107,7 @@ class Meta:
         for expected_str in (
             name, description,
             date_created, date_modified,
-            path, icon
+            path_root, path_icon
         ):
             if not isinstance(expected_str, str):
                 raise_invalid()
@@ -126,10 +126,10 @@ class Meta:
             for k, v in tags.items()
         }
 
-        name, description = str(name), str(description)
-        date_created      = datetime.fromisoformat(date_created)
-        date_modified     = datetime.fromisoformat(date_modified)
-        path, icon        = Path(path), Path(icon)
+        name, description       = str(name), str(description)
+        date_created            = datetime.fromisoformat(date_created)
+        date_modified           = datetime.fromisoformat(date_modified)
+        path_root, path_icon    = Path(path_root), Path(path_icon)
 
         return Meta(
             name          = name,
@@ -137,6 +137,6 @@ class Meta:
             tags          = tags,
             date_created  = date_created,
             date_modified = date_modified,
-            path          = path,
-            icon          = icon
+            path_root     = path_root,
+            path_icon     = path_icon
         )
