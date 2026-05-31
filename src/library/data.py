@@ -10,6 +10,9 @@ from pathlib         import Path
 from types           import MappingProxyType
 from typing          import Any, cast
 
+import inspect
+
+from library.util import ArgParse
 
 # export
 
@@ -77,6 +80,8 @@ class Meta:
     def to_dict(self) -> dict:
         data = self.__dict__.copy()
         for k in ("date_created", "date_modified", "path_root", "path_icon"):
+            if data[k] is None:
+                data.pop(k); continue
             data[k] = str(data.get(k))
         data["tags"] = TagUtil.serialize(data["tags"])
 
@@ -85,6 +90,15 @@ class Meta:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Meta:
         return cls._from_unparsed(**data)
+
+    @classmethod
+    def from_args(cls, **kwargs: Any):
+        keys = dict(inspect.getmembers(cls))['__dataclass_fields__'].keys()
+        args_filtered = {
+            k: kwargs[k]
+            for k in kwargs.keys() if k in keys
+        }
+        return cls._from_unparsed(**args_filtered)
 
     @classmethod
     def _from_unparsed(
@@ -99,44 +113,46 @@ class Meta:
 
             **kwargs: Any # allow but ignore extraneous args
     ) -> Meta:
-        def raise_invalid():
-            raise ParsingError("Invalid metadata.")
+        def raise_invalid(meta: Any = "UNSET"):
+            if meta != "UNSET":
+                raise ParsingError(f"Invalid metadata: {meta}")
+            else:
+                raise ParsingError("Invalid metadata.")
 
-        # type checking
+        # type checking / initial parsing
 
-        for expected_str in (
+        for test_type in (
             name, description,
             date_created, date_modified,
             path_root, path_icon
         ):
-            if not isinstance(expected_str, str):
-                raise_invalid()
+            if not isinstance(test_type, str|None):
+                raise_invalid(test_type)
 
-        if not isinstance(tags, dict):
-            raise_invalid()
-        for k in tags.keys():
-            t = tags.get(k)
-            if not isinstance(t, list | set):
-                raise_invalid()
+        if not isinstance(tags, dict|None):
+            raise_invalid(str(tags))
+        if tags is not None:
+            for k in tags.keys():
+                t = tags.get(k)
+                if not isinstance(t, list|set):
+                    raise_invalid(f"{t} ({k})")
+            tags = {
+                k: {str(s) for s in v}
+                for k, v in tags.items()
+            }
 
-        # parsing
+        # final parsing
 
-        tags = {
-            k: {str(s) for s in v}
-            for k, v in tags.items()
+        args = {
+            "name":          ArgParse.str_or_none(name),
+            "description":   ArgParse.str_or_none(description),
+            "tags":          tags,
+            "date_created":  ArgParse.datetime_or_none(date_created),
+            "date_modified": ArgParse.datetime_or_none(date_modified),
+            "path_root":     ArgParse.path_or_none(path_root),
+            "path_icon":     ArgParse.path_or_none(path_icon)
         }
 
-        name, description       = str(name), str(description)
-        date_created            = datetime.fromisoformat(date_created)
-        date_modified           = datetime.fromisoformat(date_modified)
-        path_root, path_icon    = Path(path_root), Path(path_icon)
-
         return Meta(
-            name          = name,
-            description   = description,
-            tags          = tags,
-            date_created  = date_created,
-            date_modified = date_modified,
-            path_root     = path_root,
-            path_icon     = path_icon
+            **{k: v for k, v in args.items() if v is not None}
         )
