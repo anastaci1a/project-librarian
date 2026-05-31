@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from enum   import Enum
-from os     import PathLike
-from pathlib import Path
-from typing import Any
+from datetime import datetime
+from enum     import Enum
+from os       import PathLike
+from pathlib  import Path
+from typing   import Any
 
 import json
 
@@ -61,6 +62,22 @@ class ArgParse:
     def str_list(arg: str|list[str]|None) -> list[str]:
         if isinstance(arg, str): return [arg]
         return arg
+
+    @staticmethod
+    def str_or_none(arg: Any|None) -> str|None:
+        if arg is not None: return str(arg)
+        return None
+
+    @staticmethod
+    def path_or_none(arg: PathSchema|None) -> Path|None:
+        if arg is not None: return Path(arg)
+        return None
+
+    @staticmethod
+    def datetime_or_none(arg: str|datetime|None) -> datetime|None:
+        if isinstance(arg, str):      return datetime.fromisoformat(arg)
+        if isinstance(arg, datetime): return arg
+        return None
 
 
 # cli
