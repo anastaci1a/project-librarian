@@ -1,7 +1,7 @@
 # dep
 
 from .data    import Tags, TagsInput, TagUtil, Meta
-from .library import Book, Library
+from .library import Folder, Library
 from .util    import JSONFile
 
 
@@ -9,6 +9,6 @@ from .util    import JSONFile
 
 __all__ = [
     'Tags', 'TagsInput', 'TagUtil', 'Meta',
-    'Book', 'Library',
+    'Folder', 'Library',
     'JSONFile'
 ]

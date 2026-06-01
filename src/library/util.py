@@ -17,6 +17,7 @@ BOX_CHARS_DEFAULT = "─│╭╮╰╯"
 
 type PathSchema = str | PathLike[str]
 
+
 # json
 
 class JSONFile:
