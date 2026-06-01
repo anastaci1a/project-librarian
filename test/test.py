@@ -1,5 +1,7 @@
 # dep
 
+import pytest
+
 from library import *
 
 
