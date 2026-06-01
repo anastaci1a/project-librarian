@@ -14,6 +14,7 @@ import inspect
 
 from library.util import ArgParse
 
+
 # export
 
 type Tags      = Mapping[str, frozenset[str]]
@@ -31,7 +32,7 @@ class TagUtil:
     @staticmethod
     def serialize(tags: Tags) -> dict[str, list[str]]:
         unfrozen: dict[str, list[str]] = {
-            k: [str(s) for s in v]
+            k: sorted([str(s) for s in v])
             for k, v in tags.items()
         }
         return unfrozen
