@@ -2,11 +2,11 @@
 
 from __future__  import annotations
 
-import os
-
 from dataclasses import dataclass
 from functools   import cached_property
 from pathlib     import Path
+
+import os
 
 from .data   import Meta, Tags, TagUtil
 from .config import LibraryConfig
@@ -15,7 +15,7 @@ from .util   import JSONFile, SomePath, resolve_parents
 
 # folders
 
-@dataclass
+@dataclass(frozen=True)
 class Folder:
     meta: Meta
 
@@ -26,13 +26,14 @@ class Folder:
             cls,
             library_root: Path,
             folder_name:  str,
-            schema:       LibraryConfig = LibraryConfig()
+            config: LibraryConfig | None = None
     ) -> Folder:
+        config = config or LibraryConfig()
         path_root = library_root.joinpath(folder_name)
-        path_meta = path_root.joinpath(schema.folder_meta_json)
+        path_meta = path_root.joinpath(config.folder_meta_json)
         try:
             meta_raw = JSONFile.read(path_meta)
-            meta     = Meta.from_dict(meta_raw)
+            meta = Meta.from_dict(meta_raw)
         except FileNotFoundError:
             meta = Meta(
                 name=folder_name,
@@ -54,14 +55,16 @@ class Library:
     def __init__(
             self,
             library_root: SomePath,
-            config:       LibraryConfig = LibraryConfig()
+            config: LibraryConfig | None = None
     ):
         self._path_root: Path = Path(library_root)
+        self._config = config or LibraryConfig()
+
         self._folders: list[Folder] = []
-        self._config: LibraryConfig = config
-        self._paths:  LibraryConfig = LibraryConfig(
+
+        self._paths: LibraryConfig = LibraryConfig(
             config_json=self._path_root.joinpath(self._config.config_json),
-            cached_json=self._path_root.joinpath(self._config.config_json),
+            cached_json=self._path_root.joinpath(self._config.cached_json),
         )
 
         self._init_library()

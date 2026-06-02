@@ -8,7 +8,7 @@ from library.util import SomePath
 
 # export
 
-@dataclass
+@dataclass(frozen=True)
 class LibraryConfig:
     # attrs
 
@@ -23,9 +23,9 @@ class LibraryConfig:
             path = self.__getattribute__(k)
             self.__setattr__(k, Path(path))
 
-    # conversion
+    # method
 
-    def to_dict(self):
+    def to_dict(self) -> dict[str, str]:
         r = self.__dict__.copy()
         for k in r.keys():
             r[k] = str(r[k])

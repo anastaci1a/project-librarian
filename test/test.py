@@ -1,7 +1,5 @@
 # dep
 
-import pytest
-
 from library import *
 
 
@@ -42,9 +40,16 @@ def test_meta():
     print("5:", meta == meta_fromfile)
     # expected: True
 
+def test_library():
+    lib = Library("./test/example-library-root")
+    # expected:
+    # - generate [root]/.library/config.json
+    # - generate [root]/*/.folder/meta.json (in each existing folder)
+
 
 # main
 
 if __name__ == "__main__":
-    test_tags(); print()
-    test_meta()
+    # test_tags(); print()
+    # test_meta(); print()
+    test_library()
