@@ -5,17 +5,6 @@ from library import *
 
 # tests
 
-def test_tags():
-    print("TAG TEST")
-
-    combined_immut = TagUtil.combine(
-            {"Category": {"Package"}, "Language": {"Java"}},
-            {"Category": {"Mobile"}, "Language": {"Kotlin"}},
-            {"Category": {"Web"}, "Language": {"HTML", "Typescript"}}
-    )
-    print("1:", TagUtil.serialize(combined_immut))
-    # expected: {"Category": {"Mobile", "Package", "Web"}, "Language": {"HTML", "Java", "Kotlin", "Typescript"}}
-
 def test_meta():
     print("META TEST")
 
@@ -40,16 +29,8 @@ def test_meta():
     print("5:", meta == meta_fromfile)
     # expected: True
 
-def test_library():
-    lib = Library("./test/example-library-root")
-    # expected:
-    # - generate [root]/.library/config.json
-    # - generate [root]/*/.folder/meta.json (in each existing folder)
-
 
 # main
 
 if __name__ == "__main__":
-    # test_tags(); print()
-    # test_meta(); print()
-    test_library()
+    test_meta()
