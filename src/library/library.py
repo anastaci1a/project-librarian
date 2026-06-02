@@ -29,7 +29,7 @@ class Folder:
             config: LibraryConfig | None = None
     ) -> Folder:
         config = config or LibraryConfig()
-        path_root = library_root.joinpath(folder_name)
+        path_root = library_root / Path(folder_name)
         path_meta = path_root.joinpath(config.folder_meta_json)
         try:
             meta_raw = JSONFile.read(path_meta)
@@ -46,6 +46,8 @@ class Folder:
 # library
 
 class Library:
+    # const
+
     _UNCACHE_ON_UPDATE = [
         "tags", "folder_paths"
     ]
@@ -59,26 +61,36 @@ class Library:
     ):
         self._path_root: Path = Path(library_root)
         self._config = config or LibraryConfig()
+        self._paths  = self._config.resolve(self._path_root)
 
         self._folders: list[Folder] = []
-
-        self._paths: LibraryConfig = LibraryConfig(
-            config_json=self._path_root.joinpath(self._config.config_json),
-            cached_json=self._path_root.joinpath(self._config.cached_json),
-        )
 
         self._init_library()
         self.rescan()
 
     # external (filesystem)
 
-    def _init_library(self):
-        JSONFile.write(
-            self._paths.config_json,
-            self._config.to_dict()
-        )
+    def _init_library(self) -> None:
+        should_write_config = True
+        try:
+            config_raw = JSONFile.read(self._paths.config_json)
+            config_read = LibraryConfig.from_dict(config_raw)
+            if config_read == self._config:
+                should_write_config = False # keep if meta is equal
+            else:
+                # overwrite / write new config if different
+                to_remove = config_read.resolve(self._path_root)
+                to_remove.config_json.unlink()                # delete old files
+                to_remove.cached_json.unlink(missing_ok=True) # ..
+        except FileNotFoundError:
+            pass
+        if should_write_config:
+            JSONFile.write(
+                self._paths.config_json,
+                self._config.to_dict()
+            )
 
-    def rescan(self):
+    def rescan(self) -> None:
         scanned = [
             f for f in os.listdir(self._path_root)
             if f[0] != "." # exclude sys dirs
@@ -87,6 +99,7 @@ class Library:
             self._folders.append(
                 Folder.load(self._path_root, f, self._config)
             )
+        self._uncache_deps()
 
     # internal
 

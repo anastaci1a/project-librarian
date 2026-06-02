@@ -98,15 +98,6 @@ class Meta:
         return cls._from_unparsed(**data)
 
     @classmethod
-    def from_args(cls, **kwargs: Any):
-        keys = dict(inspect.getmembers(cls))["__dataclass_fields__"].keys()
-        args_filtered = {
-            k: kwargs[k]
-            for k in kwargs.keys() if k in keys
-        }
-        return cls._from_unparsed(**args_filtered)
-
-    @classmethod
     def _from_unparsed(
             cls,
             name:          Any = None,
@@ -149,7 +140,7 @@ class Meta:
 
         # final parsing
 
-        args = {
+        args_parsed = {
             "name":          ArgParse.str_or_none(name),
             "description":   ArgParse.str_or_none(description),
             "tags":          tags,
@@ -159,6 +150,6 @@ class Meta:
             "path_icon":     ArgParse.path_or_none(path_icon)
         }
 
-        return Meta(
-            **{k: v for k, v in args.items() if v is not None}
-        )
+        return cls(**{
+            k: v for k, v in args_parsed.items() if v is not None
+        })
