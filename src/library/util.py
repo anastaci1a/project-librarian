@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os.path
 from datetime import datetime
 from enum     import Enum
 from os       import PathLike
@@ -9,6 +10,7 @@ from pathlib  import Path
 from typing   import Any
 
 import json
+import sys
 
 
 # const
@@ -18,13 +20,46 @@ BOX_CHARS_DEFAULT = "─│╭╮╰╯"
 type SomePath = str | PathLike[str]
 
 
-# file
+# generic file/folder operations
 
-def resolve_parents(file: SomePath) -> None:
-    Path(file).parent.mkdir(parents=True, exist_ok=True)
+class File:
+    @staticmethod
+    def resolve_parents(file: SomePath) -> None:
+        Path(file).parent.mkdir(parents=True, exist_ok=True)
+
+    @staticmethod
+    def get_creation_date(file: SomePath) -> datetime:
+        stat, ts = Path(file).stat(), None
+        if sys.platform == "win32":
+            ts = stat.st_ctime
+        else:
+            try:
+                ts = stat.st_birthtime
+            except AttributeError:
+                ts = stat.st_ctime
+        return datetime.fromtimestamp(ts)
+
+    @staticmethod
+    def get_date_modified(file: SomePath) -> datetime:
+        return datetime.fromtimestamp(
+            Path(file).stat().st_mtime
+        )
+
+    @staticmethod
+    def get_child_latest_date_modified(
+            folder: SomePath,
+            exclude_dotfiles: bool = True
+    ) -> datetime|None:
+        scanned = list(os.scandir(folder))
+        if exclude_dotfiles:
+            scanned = [p for p in scanned if not p.name.startswith(".")]
+        ts_latest = max([p.stat().st_mtime for p in scanned], default=None)
+        if ts_latest is None:
+            return None
+        return datetime.fromtimestamp(ts_latest)
 
 
-# json
+# json utils
 
 class JSONFile:
     class _ImmutEncoder(json.JSONEncoder):
@@ -44,7 +79,7 @@ class JSONFile:
     ) -> str:
         path = Path(outfile)
         if create_parent_dirs:
-            resolve_parents(path)
+            File.resolve_parents(path)
         json_str = json.dumps(
             json_serializable,
             indent=indent,
