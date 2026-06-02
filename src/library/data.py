@@ -66,7 +66,12 @@ class Meta:
     # sys
 
     def __key(self) -> tuple:
-        return self.date_created, self.name
+        return (
+            self.name, self.description,
+            self.tags,
+            self.date_created, self.date_modified,
+            self.path_root,    self.path_icon
+        )
 
     def __hash__(self) -> int:
         return hash(self.__key())
@@ -94,7 +99,7 @@ class Meta:
 
     @classmethod
     def from_args(cls, **kwargs: Any):
-        keys = dict(inspect.getmembers(cls))['__dataclass_fields__'].keys()
+        keys = dict(inspect.getmembers(cls))["__dataclass_fields__"].keys()
         args_filtered = {
             k: kwargs[k]
             for k in kwargs.keys() if k in keys

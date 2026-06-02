@@ -14,6 +14,10 @@ class Folder:
     meta: Meta
 
 class Library:
+    _UNCACHE_ON_UPDATE = [
+        "tags", "folder_paths"
+    ]
+
     # constr
 
     def __init__(self):
@@ -26,6 +30,12 @@ class Library:
         return self._folders.copy()
 
     @cached_property
+    def folder_paths(self) -> list[Path]:
+        return [
+            f.meta.path_root for f in self._folders
+        ]
+
+    @cached_property
     def tags(self) -> Tags:
         return TagUtil.combine(*[
             f.meta.tags for f in self._folders
@@ -33,4 +43,8 @@ class Library:
 
     def add_folders(self, *folders: Folder):
         self._folders.extend(folders)
-        self.__dict__.pop("tags", None)
+        self._uncache_deps()
+
+    def _uncache_deps(self):
+        for d in Library._UNCACHE_ON_UPDATE:
+            self.__dict__.pop(d, None)

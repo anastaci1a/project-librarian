@@ -15,7 +15,13 @@ import json
 
 BOX_CHARS_DEFAULT = "─│╭╮╰╯"
 
-type PathSchema = str | PathLike[str]
+type SomePath = str | PathLike[str]
+
+
+# file
+
+def resolve_parents(file: SomePath) -> None:
+    Path(file).parent.mkdir(parents=True, exist_ok=True)
 
 
 # json
@@ -30,7 +36,7 @@ class JSONFile:
 
     @staticmethod
     def write(
-            outfile:            PathSchema,
+            outfile:            SomePath,
             json_serializable:  Any,
             create_parent_dirs: bool = True,
             indent:             int  = 2,
@@ -38,7 +44,7 @@ class JSONFile:
     ) -> str:
         path = Path(outfile)
         if create_parent_dirs:
-            path.parent.mkdir(parents=True, exist_ok=True)
+            resolve_parents(path)
         json_str = json.dumps(
             json_serializable,
             indent=indent,
@@ -50,7 +56,7 @@ class JSONFile:
         return json_str
 
     @staticmethod
-    def read(infile: PathSchema) -> Any:
+    def read(infile: SomePath) -> Any:
         with open(infile, "r") as file:
             json_str = "".join(file.readlines())
         return json.loads(json_str)
@@ -70,7 +76,7 @@ class ArgParse:
         return None
 
     @staticmethod
-    def path_or_none(arg: PathSchema|None) -> Path|None:
+    def path_or_none(arg: SomePath|None) -> Path|None:
         if arg is not None: return Path(arg)
         return None
 
