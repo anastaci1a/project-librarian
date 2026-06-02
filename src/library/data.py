@@ -53,10 +53,10 @@ class Meta:
     name:          str              = "Untitled"
     description:   str              = ""
     tags:          Tags | TagsInput = field(default_factory=dict)
-    date_created:  datetime         = field(default_factory=datetime.now)
-    date_modified: datetime         = field(default_factory=datetime.now)
-    path_root:     Path | None      = None
-    path_icon:     Path | None      = None
+    date_created:  datetime | None  = None
+    date_modified: datetime | None  = None
+    path_root:     Path     | None  = None
+    path_icon:     Path     | None  = None
 
     # freeze tags
 
@@ -116,23 +116,29 @@ class Meta:
             else:
                 raise ParsingError("Invalid metadata.")
 
-        # type checking / initial parsing
+        # str/date type checking
 
-        for test_type in (
-            name, description,
-            date_created, date_modified,
-            path_root, path_icon
+        for test_str in (
+            name, description, path_root, path_icon
         ):
-            if not isinstance(test_type, str|None):
-                raise_invalid(test_type)
+            if not isinstance(test_str, str|None):
+                raise_invalid(test_str)
+
+        for test_date in (
+            date_created, date_modified
+        ):
+            if not isinstance(test_date, str|datetime|None):
+                raise_invalid(test_date)
+
+        # tags type checking / initial parsing
 
         if not isinstance(tags, dict|None):
             raise_invalid(str(tags))
         if tags is not None:
             for k in tags.keys():
-                t = tags.get(k)
-                if not isinstance(t, list|set):
-                    raise_invalid(f"{t} ({k})")
+                test_tag = tags.get(k)
+                if not isinstance(test_tag, list|set):
+                    raise_invalid(f"{test_tag} ({k})")
             tags = {
                 k: {str(s) for s in v}
                 for k, v in tags.items()
