@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os.path
 from datetime import datetime
 from enum     import Enum
 from os       import PathLike
@@ -10,6 +9,7 @@ from pathlib  import Path
 from typing   import Any
 
 import json
+import os
 import sys
 
 
@@ -20,15 +20,28 @@ BOX_CHARS_DEFAULT = "─│╭╮╰╯"
 type SomePath = str | PathLike[str]
 
 
-# generic file/folder operations
+# generic file/folder utils / data collection
 
-class File:
-    @staticmethod
-    def resolve_parents(file: SomePath) -> None:
+class FileData:
+    @classmethod
+    def make_valid_subdir_name(
+            cls,
+            parent_dir:       SomePath,
+            proposed_name:    str,
+            numbering_scheme: str = "%s (%d)"
+    ):
+        test_name, i = proposed_name, 0
+        while (parent_dir / Path(test_name)).is_dir():
+            i += 1
+            test_name = numbering_scheme % (proposed_name, i)
+        return test_name
+
+    @classmethod
+    def resolve_parents(cls, file: SomePath) -> None:
         Path(file).parent.mkdir(parents=True, exist_ok=True)
 
-    @staticmethod
-    def get_creation_date(file: SomePath) -> datetime:
+    @classmethod
+    def get_creation_date(cls, file: SomePath) -> datetime:
         stat, ts = Path(file).stat(), None
         if sys.platform == "win32":
             ts = stat.st_ctime
@@ -39,14 +52,15 @@ class File:
                 ts = stat.st_ctime
         return datetime.fromtimestamp(ts)
 
-    @staticmethod
-    def get_date_modified(file: SomePath) -> datetime:
+    @classmethod
+    def get_date_modified(cls, file: SomePath) -> datetime:
         return datetime.fromtimestamp(
             Path(file).stat().st_mtime
         )
 
-    @staticmethod
+    @classmethod
     def get_child_latest_date_modified(
+            cls,
             folder: SomePath,
             exclude_dotfiles: bool = True
     ) -> datetime|None:
@@ -59,7 +73,7 @@ class File:
         return datetime.fromtimestamp(ts_latest)
 
 
-# json utils
+# json-specific utils
 
 class JSONFile:
     class _ImmutEncoder(json.JSONEncoder):
@@ -79,7 +93,7 @@ class JSONFile:
     ) -> str:
         path = Path(outfile)
         if create_parent_dirs:
-            File.resolve_parents(path)
+            FileData.resolve_parents(path)
         json_str = json.dumps(
             json_serializable,
             indent=indent,
@@ -97,32 +111,32 @@ class JSONFile:
         return json.loads(json_str)
 
 
-# arg
+# arg parsing
 
 class ArgParse:
     @staticmethod
-    def str_list(arg: str|list[str]|None) -> list[str]:
+    def str_list(arg: str|list[str]|None) -> list[str]|None:
         if isinstance(arg, str): return [arg]
         return arg
 
     @staticmethod
-    def str_or_none(arg: Any|None) -> str|None:
+    def str_or_none(arg: Any) -> str|None:
         if arg is not None: return str(arg)
         return None
 
     @staticmethod
-    def path_or_none(arg: SomePath|None) -> Path|None:
-        if arg is not None: return Path(arg)
+    def path_or_none(arg: Any) -> Path|None:
+        if isinstance(arg, str|PathLike): return Path(arg)
         return None
 
     @staticmethod
-    def datetime_or_none(arg: str|datetime|None) -> datetime|None:
+    def datetime_or_none(arg: Any) -> datetime|None:
         if isinstance(arg, str):      return datetime.fromisoformat(arg)
         if isinstance(arg, datetime): return arg
         return None
 
 
-# cli
+# cli formatting / displaying
 
 class Ansi(Enum):
     F_RESET     = "\033[0m"

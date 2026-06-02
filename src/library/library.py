@@ -2,7 +2,7 @@
 
 from __future__  import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools   import cached_property
 from pathlib     import Path
 
@@ -10,14 +10,35 @@ import os
 
 from .data   import Meta, Tags, TagUtil
 from .config import LibraryConfig
-from .util   import JSONFile, SomePath, File
+from .util import JSONFile, SomePath, FileData
 
 
 # folders
 
-@dataclass(frozen=True)
 class Folder:
-    meta: Meta
+    # constr
+
+    def __init__(self, path_root: Path, meta: Meta):
+        self._path_root = path_root
+        self._meta = meta
+
+    # prop
+
+    @property
+    def meta(self):
+        return self._meta
+
+    @property
+    def name(self):
+        return self.meta.name
+
+    @property
+    def path_root(self):
+        return self._path_root
+
+    @property
+    def path_meta(self):
+        return self.path_root / self.meta.relpath_meta
 
     # sys
 
@@ -26,64 +47,90 @@ class Folder:
             return self.meta.name == other.meta.name
         return NotImplemented
 
-    # load
+    # meta
+
+    def meta_refresh(self, overwrite: bool = True):
+        self._meta = self._meta.get_refreshed(self.path_root)
+        if overwrite:
+            pass
+
+    # load (classmethod)
 
     @classmethod
     def load(
             cls,
-            library_root: Path,
-            folder_name:  str,
-            config:       LibraryConfig | None = None,
-            update_meta:  bool                 = False
+            library_root:      Path,
+            folder_name:       str,
+            config:            LibraryConfig | None = None,
+            create_if_missing: bool = True
     ) -> Folder:
-        config = config or LibraryConfig()
-        folder_root = library_root / folder_name
-        path_meta   = folder_root / config.folder_meta_json
+        # init config
+        library_config = config or LibraryConfig()
+        path_folder    = library_root / folder_name
+        path_meta      = path_folder / library_config.folder_meta_json
 
-        try:
-            meta_raw = JSONFile.read(path_meta)
-            meta = Meta.from_dict(meta_raw)
-        except FileNotFoundError:
+        if not path_meta.is_file():
+            # meta does not exist
+            if not create_if_missing:
+                raise FileNotFoundError(f"Folder \"{folder_name}\" was not found, and create_if_missing is disabled.")
             return cls.create(
-                library_root, Meta(name=folder_name),
-                config=config, update_meta=update_meta
+                library_root,
+                library_config=library_config,
+                meta=Meta(
+                    name=folder_name,
+                    relpath_meta=library_config.folder_meta_json
+                ),
+
+                # no meta exists, collisions/overwrite is ok
+                rename_folder_collisions=False,
+                allow_overwrite=True
             )
-        if update_meta:
-            meta = cls._update_meta(folder_root, meta)
-        JSONFile.write(path_meta, meta.to_dict())
-        return cls(meta)
+
+        # meta exists
+        meta_raw = JSONFile.read(path_meta)
+        meta = Meta.from_dict(meta_raw)
+        return Folder(path_folder, meta)
 
     @classmethod
     def create(
             cls,
-            library_root: Path,
-            meta:         Meta,
-            config:       LibraryConfig | None = None,
-            update_meta:  bool = False
+            library_root:             Path,
+            library_config:           LibraryConfig | None = None,
+            meta:                     Meta          | None = None,
+            rename_folder_collisions: bool = True,
+            allow_overwrite:          bool = False
     ) -> Folder:
-        config = config or LibraryConfig()
-        folder_root = library_root / meta.name
-        path_meta   = folder_root / config.folder_meta_json
+        # init config
+        meta           = meta or Meta()
+        library_config = library_config or LibraryConfig()
+        path_folder    = library_root / meta.name
+        path_meta = path_folder / library_config.folder_meta_json
 
-        folder_root.mkdir(exist_ok=True)
-        if update_meta:
-            meta = cls._update_meta(folder_root, meta)
+        # handle collisions
+        if path_folder.is_dir():
+            if rename_folder_collisions:
+                # e.g. "Untitled (3)"
+                name_valid = FileData.make_valid_subdir_name(library_root, meta.name)
+                meta = replace(
+                    meta, name=name_valid, relpath_meta=library_config.folder_meta_json
+                )
+                # redefine:
+                path_folder = library_root / meta.name
+                path_meta = path_folder / library_config.folder_meta_json
+            elif not allow_overwrite:
+                raise FileExistsError(
+                    f"Folder \"{meta.name}\" already exists, and rename_collisions and allow_overwrite are disabled."
+                )
+
+        # create folder/meta
+        if path_meta.is_file():
+            if not allow_overwrite:
+                raise FileExistsError(
+                    f"Folder \"{meta.name}\" already exists, and allow_overwrite is disabled."
+                )
+
         JSONFile.write(path_meta, meta.to_dict())
-
-        return cls(meta)
-
-    @classmethod
-    def _update_meta(cls, root: Path, meta: Meta) -> Meta:
-        creation_date   = File.get_creation_date(root)
-        latest_modified = File.get_child_latest_date_modified(root, exclude_dotfiles=True)
-
-        meta_dict = meta.to_dict()
-        meta_dict["date_created"] = meta.date_created or creation_date
-        meta_dict["date_modified"] = (
-            latest_modified or meta.date_modified or meta_dict["date_created"]
-        )
-
-        return Meta.from_dict(meta_dict)
+        return cls(path_folder, meta)
 
 
 # library
@@ -100,7 +147,7 @@ class Library:
     def __init__(
             self,
             library_root: SomePath,
-            config: LibraryConfig|None = None,
+            config: LibraryConfig | None = None,
 
             config_create_if_missing: bool = True,
             config_allow_overwrite:   bool = False,
@@ -118,7 +165,7 @@ class Library:
             config_create_if_missing,
             config_allow_overwrite
         )
-        self.total_rescan(update_meta=update_folder_meta)
+        self.folders_rescan(update_meta=update_folder_meta)
 
     # util
 
@@ -161,7 +208,7 @@ class Library:
                 self._config.to_dict()
             )
 
-    def total_rescan(
+    def folders_rescan(
             self,
             update_meta: bool = False
     ) -> None:
@@ -176,10 +223,15 @@ class Library:
         for d in scanned:
             self._folders.append(
                 Folder.load(
-                    self._paths.root, d.name, self._config,
-                    update_meta=update_meta
+                    self._paths.root, d.name, self._config
                 )
             )
+
+    def meta_refresh(self) -> None:
+        self._uncache_props()
+
+        for f in self._folders:
+            f.meta_refresh()
 
     # internal
 
@@ -202,7 +254,6 @@ class Library:
     def add_folders(
             self,
             *folders:        Folder,
-            update_meta:     bool = False,
             skip_duplicates: bool = True
     ):
         # ensure no duplicates before add
@@ -210,17 +261,17 @@ class Library:
             folders = [f for f in folders if f not in self._folders]
         else:
             for f in folders:
-                for f_exist in self._folders:
-                    if f == f_exist:
-                        raise FileExistsError(f"The folder \"{f.meta.name}\" already exists, and cannot be added again.")
+                if f in self._folders:
+                    raise FileExistsError(f"Folder \"{f.meta.name}\" already exists, and cannot be added again.")
 
-        for f in folders:
-            new_folder = Folder.create(
-                self._paths.root,
-                f.meta,
-                update_meta=update_meta
-            )
-            self._folders.append(new_folder)
+        # for f in folders:
+        #     new_folder = Folder.create(
+        #         self._paths.root,
+        #         self._config,
+        #         meta=f.meta
+        #     )
+        #     self._folders.append(new_folder)
+        self._folders.extend(folders)
 
         self._uncache_props()
 

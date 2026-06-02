@@ -4,18 +4,16 @@ from __future__  import annotations
 
 from collections.abc import Mapping
 from configparser    import ParsingError
-from dataclasses     import dataclass, field
+from dataclasses     import dataclass, field, replace
 from datetime        import datetime
 from pathlib         import Path
 from types           import MappingProxyType
 from typing          import Any, cast
 
-import inspect
-
-from library.util import ArgParse
+from .util import ArgParse, FileData
 
 
-# export
+# tags
 
 type Tags      = Mapping[str, frozenset[str]]
 type TagsInput = Mapping[str, set[str]]
@@ -46,7 +44,10 @@ class TagUtil:
                 combined[k].update(v)
         return TagUtil.freeze(combined)
 
-@dataclass
+
+# meta
+
+@dataclass(frozen=True)
 class Meta:
     # props
 
@@ -55,13 +56,17 @@ class Meta:
     tags:          Tags | TagsInput = field(default_factory=dict)
     date_created:  datetime | None  = None
     date_modified: datetime | None  = None
-    path_root:     Path     | None  = None
+    relpath_meta:  Path     | None  = None
     path_icon:     Path     | None  = None
 
-    # freeze tags
+    # init (freeze attrs)
 
     def __post_init__(self):
-        self.tags = TagUtil.freeze(self.tags)
+        object.__setattr__(
+            self,
+            "tags",
+            TagUtil.freeze(self.tags)
+        )
 
     # sys
 
@@ -70,7 +75,7 @@ class Meta:
             self.name, self.description,
             self.tags,
             self.date_created, self.date_modified,
-            self.path_root,    self.path_icon
+            self.relpath_meta, self.path_icon
         )
 
     def __hash__(self) -> int:
@@ -81,11 +86,32 @@ class Meta:
             return self.__key() == other.__key()
         return NotImplemented
 
+    # copy with modif
+
+    def get_refreshed(self, root: Path) -> Meta:
+        date_folder_created    = FileData.get_creation_date(root)
+        date_folder_modified   = FileData.get_date_modified(root)
+        date_children_modified = FileData.get_child_latest_date_modified(root, exclude_dotfiles=True)
+
+        new_date_created = self.date_created or date_folder_created
+        new_date_modified = (
+                date_children_modified
+                or date_folder_modified
+                or self.date_modified
+                or self.date_created
+        )
+
+        return replace(
+            self,
+            date_created  = new_date_created,
+            date_modified = new_date_modified
+        )
+
     # method
 
     def to_dict(self) -> dict:
         data = self.__dict__.copy()
-        for k in ("date_created", "date_modified", "path_root", "path_icon"):
+        for k in ("date_created", "date_modified", "relpath_meta", "path_icon"):
             if data[k] is None:
                 data.pop(k); continue
             data[k] = str(data.get(k))
@@ -105,7 +131,7 @@ class Meta:
             tags:          Any = None,
             date_created:  Any = None,
             date_modified: Any = None,
-            path_root:     Any = None,
+            relpath_meta:  Any = None,
             path_icon:     Any = None,
 
             **kwargs: Any # allow but ignore extraneous args
@@ -119,7 +145,8 @@ class Meta:
         # str/date type checking
 
         for test_str in (
-            name, description, path_root, path_icon
+            name, description,
+            relpath_meta, path_icon
         ):
             if not isinstance(test_str, str|None):
                 raise_invalid(test_str)
@@ -152,7 +179,7 @@ class Meta:
             "tags":          tags,
             "date_created":  ArgParse.datetime_or_none(date_created),
             "date_modified": ArgParse.datetime_or_none(date_modified),
-            "path_root":     ArgParse.path_or_none(path_root),
+            "relpath_meta":  ArgParse.path_or_none(relpath_meta),
             "path_icon":     ArgParse.path_or_none(path_icon)
         }
 
