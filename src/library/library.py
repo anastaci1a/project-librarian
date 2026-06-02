@@ -215,10 +215,14 @@ class Library:
                         raise FileExistsError(f"The folder \"{f.meta.name}\" already exists, and cannot be added again.")
 
         for f in folders:
-            Folder.create(self._paths.root, f.meta, update_meta=update_meta)
+            new_folder = Folder.create(
+                self._paths.root,
+                f.meta,
+                update_meta=update_meta
+            )
+            self._folders.append(new_folder)
 
         self._uncache_props()
-        self._folders.extend(folders)
 
     def _uncache_props(self):
         for d in Library._UNCACHE_ON_UPDATE:
