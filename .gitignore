@@ -1,5 +1,7 @@
 /.idea/
 /.pytest_cache/
+/test/**/.folder/
+/test/**/.library/
 **/*.iml
 **/*.temp.*
 **/__pycache__/
