@@ -10,7 +10,7 @@ import os
 
 from .data   import Meta, Tags, TagUtil
 from .config import LibraryConfig
-from .util   import JSONFile, SomePath
+from .util   import JSONFile, SomePath, File
 
 
 # folders
@@ -19,6 +19,13 @@ from .util   import JSONFile, SomePath
 class Folder:
     meta: Meta
 
+    # sys
+
+    def __eq__(self, other: Folder) -> bool:
+        if isinstance(other, Folder):
+            return self.meta.name == other.meta.name
+        return NotImplemented
+
     # load
 
     @classmethod
@@ -26,21 +33,57 @@ class Folder:
             cls,
             library_root: Path,
             folder_name:  str,
-            config: LibraryConfig | None = None
+            config:       LibraryConfig | None = None,
+            update_meta:  bool                 = False
     ) -> Folder:
         config = config or LibraryConfig()
-        path_root = library_root / folder_name
-        path_meta = path_root / config.folder_meta_json
+        folder_root = library_root / folder_name
+        path_meta   = folder_root / config.folder_meta_json
+
         try:
             meta_raw = JSONFile.read(path_meta)
             meta = Meta.from_dict(meta_raw)
         except FileNotFoundError:
-            meta = Meta(
-                name=folder_name,
-                path_root=path_root
+            return cls.create(
+                library_root, Meta(name=folder_name),
+                config=config, update_meta=update_meta
             )
-            JSONFile.write(path_meta, meta.to_dict())
+        if update_meta:
+            meta = cls._update_meta(folder_root, meta)
+        JSONFile.write(path_meta, meta.to_dict())
         return cls(meta)
+
+    @classmethod
+    def create(
+            cls,
+            library_root: Path,
+            meta:         Meta,
+            config:       LibraryConfig | None = None,
+            update_meta:  bool = False
+    ) -> Folder:
+        config = config or LibraryConfig()
+        folder_root = library_root / meta.name
+        path_meta   = folder_root / config.folder_meta_json
+
+        folder_root.mkdir(exist_ok=True)
+        if update_meta:
+            meta = cls._update_meta(folder_root, meta)
+        JSONFile.write(path_meta, meta.to_dict())
+
+        return cls(meta)
+
+    @classmethod
+    def _update_meta(cls, root: Path, meta: Meta) -> Meta:
+        creation_date   = File.get_creation_date(root)
+        latest_modified = File.get_child_latest_date_modified(root, exclude_dotfiles=True)
+
+        meta_dict = meta.to_dict()
+        meta_dict["date_created"] = meta.date_created or creation_date
+        meta_dict["date_modified"] = (
+            latest_modified or meta.date_modified or meta_dict["date_created"]
+        )
+
+        return Meta.from_dict(meta_dict)
 
 
 # library
@@ -60,7 +103,8 @@ class Library:
             config: LibraryConfig|None = None,
 
             config_create_if_missing: bool = True,
-            config_allow_overwrite:   bool = False
+            config_allow_overwrite:   bool = False,
+            update_folder_meta:       bool = False
     ):
         self._folders: list[Folder] = []
         self._assign_config_and_paths(
@@ -72,9 +116,9 @@ class Library:
         self._init_library(
             config_was_provided,
             config_create_if_missing,
-            config_allow_overwrite,
+            config_allow_overwrite
         )
-        self.rescan()
+        self.total_rescan(update_meta=update_folder_meta)
 
     # util
 
@@ -92,6 +136,7 @@ class Library:
         try:
             config_found_dict = JSONFile.read(self._paths.config_json)
             config_found = LibraryConfig.from_dict(config_found_dict)
+
             if not config_was_provided or config_found == self._config:
                 # use existing config
                 write_new_config = False
@@ -108,24 +153,33 @@ class Library:
             write_new_config = True # new config if none found
             if not create_if_missing:
                 raise FileNotFoundError("Did not find configuration file(s), but create_if_missing is disabled.")
-        # (write)
+
         if write_new_config:
+            # write
             JSONFile.write(
                 self._paths.config_json,
                 self._config.to_dict()
             )
 
-    def rescan(self) -> None:
+    def total_rescan(
+            self,
+            update_meta: bool = False
+    ) -> None:
+        self._uncache_props()
         self._folders.clear()
+
         scanned = [
             d for d in os.scandir(self._paths.root)
-            if d.is_dir() and not d.name.startswith(".") # only non-sys dirs
+            if d.is_dir() and not d.name.startswith(".") # only non-dotfile dirs
         ]
+
         for d in scanned:
             self._folders.append(
-                Folder.load(self._paths.root, d.name, self._config)
+                Folder.load(
+                    self._paths.root, d.name, self._config,
+                    update_meta=update_meta
+                )
             )
-        self._uncache_props()
 
     # internal
 
@@ -145,9 +199,26 @@ class Library:
             f.meta.tags for f in self._folders
         ])
 
-    def add_folders(self, *folders: Folder):
-        self._folders.extend(folders)
+    def add_folders(
+            self,
+            *folders:        Folder,
+            update_meta:     bool = False,
+            skip_duplicates: bool = True
+    ):
+        # ensure no duplicates before add
+        if skip_duplicates:
+            folders = [f for f in folders if f not in self._folders]
+        else:
+            for f in folders:
+                for f_exist in self._folders:
+                    if f == f_exist:
+                        raise FileExistsError(f"The folder \"{f.meta.name}\" already exists, and cannot be added again.")
+
+        for f in folders:
+            Folder.create(self._paths.root, f.meta, update_meta=update_meta)
+
         self._uncache_props()
+        self._folders.extend(folders)
 
     def _uncache_props(self):
         for d in Library._UNCACHE_ON_UPDATE:
