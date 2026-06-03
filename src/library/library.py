@@ -8,9 +8,9 @@ from pathlib     import Path
 
 import os
 
-from .data   import Meta, Tags, TagUtil
 from .config import LibraryConfig, LibraryPaths
-from .util   import JSONFile, SomePath, FileData
+from .data   import Meta, Tags, TagUtil
+from .util   import FileData, JSONFile, SomePath
 
 
 # folders
@@ -18,12 +18,17 @@ from .util   import JSONFile, SomePath, FileData
 class Folder:
     # constr
 
-    def __init__(self, path_root: Path, path_meta: Path, meta: Meta):
-        self._path_root = path_root
-        self._path_meta = path_meta
-        self._meta = meta
+    def __init__(self, library: Library, meta: Meta):
+        self._library   = library
+        self._path_root = library.paths.root / meta.name
+        self._path_meta = self._path_root / library.config.folder_meta_json
+        self._meta      = meta
 
     # prop
+
+    @property
+    def library(self):
+        return self._library
 
     @property
     def meta(self):
@@ -55,71 +60,69 @@ class Folder:
         if overwrite:
             pass
 
-    # load (classmethod)
+    # load/create
 
     @classmethod
     def load(
             cls,
-            library_root:      Path,
-            folder_name:       str,
-            config:            LibraryConfig | None = None,
+            library:     Library,
+            folder_name: str,
+            # ..
             create_if_missing: bool = True
     ) -> Folder:
         # init config
-        library_config = config or LibraryConfig()
-        path_folder    = library_root / folder_name
-        path_meta      = path_folder / library_config.folder_meta_json
+        path_folder = library.paths.root / folder_name
+        path_meta   = path_folder / library.config.folder_meta_json
 
         if not path_meta.is_file():
             # meta does not exist
             if not create_if_missing:
                 raise FileNotFoundError(f"Folder \"{folder_name}\" was not found, and create_if_missing is disabled.")
+            # create new meta
             return cls.create(
-                library_root,
-                library_config=library_config,
-                meta=Meta(
-                    name=folder_name
-                ),
+                library, Meta(name=folder_name),
 
-                # no meta exists, collisions/overwrite is ok
+                # since no meta exists, renaming is not necessary, overwrite/refreshing is ok
                 rename_folder_collisions=False,
-                allow_overwrite=True
+                allow_overwrite=True,
+                refresh_meta=True
             )
 
         # meta exists
         meta_raw = JSONFile.read(path_meta)
         meta = Meta.from_dict(meta_raw)
-        return Folder(path_folder, path_meta, meta)
+        return Folder(library, meta)
 
     @classmethod
     def create(
             cls,
-            library_root:             Path,
-            library_config:           LibraryConfig | None = None,
-            meta:                     Meta          | None = None,
+            library: Library,
+            meta:    Meta | None = None,
+            # ..
             rename_folder_collisions: bool = True,
-            allow_overwrite:          bool = False
+            allow_overwrite:          bool = False,
+            refresh_meta:             bool = False
     ) -> Folder:
         # init config
-        meta           = meta or Meta()
-        library_config = library_config or LibraryConfig()
-        path_folder    = library_root / meta.name
+        meta_not_provided = meta is None
+        meta = meta or Meta()
+        path_folder = library.paths.root / meta.name
 
         # handle collisions
         if path_folder.is_dir():
             if rename_folder_collisions:
                 # e.g. "Untitled (3)"
-                name_valid = FileData.make_valid_subdir_name(library_root, meta.name)
+                name_valid = FileData.make_valid_subdir_name(library.paths.root, meta.name)
                 meta = replace(
                     meta, name=name_valid
                 )
-                path_folder = library_root / meta.name # (redefine)
+                path_folder = library.paths.root / meta.name # (redefine)
             elif not allow_overwrite:
                 raise FileExistsError(
                     f"Folder \"{meta.name}\" already exists, and rename_collisions and allow_overwrite are disabled."
                 )
 
-        path_meta = path_folder / library_config.folder_meta_json
+        path_meta = path_folder / library.config.folder_meta_json
 
         # create folder/meta
         if path_meta.is_file():
@@ -128,8 +131,11 @@ class Folder:
                     f"Folder \"{meta.name}\" already exists, and allow_overwrite is disabled."
                 )
 
+        FileData.resolve_parents(path_meta)
+        if refresh_meta or meta_not_provided:
+            meta = meta.get_refreshed(path_folder)
         JSONFile.write(path_meta, meta.to_dict())
-        return cls(path_folder, path_meta, meta)
+        return cls(library, meta)
 
 
 # library
@@ -148,9 +154,9 @@ class Library:
             library_root: SomePath,
             config: LibraryConfig | None = None,
 
-            config_create_if_missing: bool = True,
-            config_allow_overwrite:   bool = False,
-            update_folder_meta:       bool = False
+            scan_folders:                  bool = True,
+            config_create_if_missing:      bool = True,
+            config_allow_overwrite:        bool = False
     ):
         self._folders: list[Folder] = []
         self._assign_config_and_paths(
@@ -164,7 +170,11 @@ class Library:
             config_create_if_missing,
             config_allow_overwrite
         )
-        self.folders_rescan(update_meta=update_folder_meta)
+
+        if scan_folders:
+            self.folders_rescan(
+                # create_if_missing=True # (default)
+            )
 
     # main props
 
@@ -194,7 +204,7 @@ class Library:
             f.meta.tags for f in self._folders
         ])
 
-    # file init/loading
+    # filesystem
 
     def _init_library(self, config_was_provided: bool, create_if_missing: bool, allow_overwrite: bool) -> None:
         try:
@@ -227,10 +237,15 @@ class Library:
 
     # <folder>.* mut
 
-    def folders_rescan(
-            self,
-            update_meta: bool = False
-    ) -> None:
+    def meta_refresh(self) -> None:
+        self._uncache_props()
+
+        for f in self._folders:
+            f.meta_refresh()
+
+    # self.* mut
+
+    def folders_rescan(self, create_if_missing: bool = True) -> None:
         self._uncache_props()
         self._folders.clear()
 
@@ -242,17 +257,10 @@ class Library:
         for d in scanned:
             self._folders.append(
                 Folder.load(
-                    self._paths.root, d.name, self._config
+                    self, d.name,
+                    create_if_missing=create_if_missing
                 )
             )
-
-    def meta_refresh(self) -> None:
-        self._uncache_props()
-
-        for f in self._folders:
-            f.meta_refresh()
-
-    # self.* mut
 
     def add_folders(
             self,
@@ -267,9 +275,13 @@ class Library:
                 if f in self._folders:
                     raise FileExistsError(f"Folder \"{f.meta.name}\" already exists, and cannot be added again.")
 
-        # # this process makes less sense now that
-        # # Folder instances must be associated with
-        # # a Library instance to begin with
+        self._folders.extend(folders)
+        self._uncache_props()
+
+        ### the below process makes less sense now that Folder instances
+        ### must be associated with a Library instance to begin with, so
+        ### reinstantiation is not necessary anymore
+
         # for f in folders:
         #     new_folder = Folder.create(
         #         self._paths.root,
@@ -278,8 +290,7 @@ class Library:
         #     )
         #     self._folders.append(new_folder)
 
-        self._folders.extend(folders)
-        self._uncache_props()
+        ### TODO: this entire function is not really needed tbh, I more need copy/move_folders
 
     # util
 

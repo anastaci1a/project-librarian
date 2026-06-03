@@ -8,20 +8,13 @@ from library import *
 # tests
 
 def test_library():
-    root = Path("./test/example-library-root")
-
-    lib = Library(
-        root, update_folder_meta=True
-    )
-
+    lib = Library("./test/example-library-root")
     # expected:
     # - generate [root]/.library/config.json
     # - generate [root]/*/.folder/meta.json (in each existing folder)
     #   - (each has date_created and date_modified)
 
-    lib.add_folders(
-      Folder.create(root, meta=Meta(name="_NEW_"))
-    )
+    Folder.create(lib, meta=Meta(name="_NEW_"), refresh_meta=True)
     # expected:
     # - generate [root]/_NEW_/.folder/meta.json
     #   - (has date_created and date_modified)
