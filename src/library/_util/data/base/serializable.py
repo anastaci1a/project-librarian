@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 from abc    import ABC, abstractmethod
-from typing import Any
+from typing import Any, Self
 
 from ...._util.file import JSONFile, SomePath
 
 
 # types
 
-type _SerializedShallow = str|list|dict
-type Serialized = str|list[_SerializedShallow]|dict[str, _SerializedShallow]
+type JSONPrimitive = None | bool | int | float | str
+type JSONValue = JSONPrimitive | list[JSONPrimitive] | dict[str, JSONPrimitive]
 
 
 # data
@@ -32,17 +32,17 @@ class Serializable[T](ABC):
 
     @classmethod
     @abstractmethod
-    def _parse(cls, data: Any|Serialized, **kwargs: Any) -> T:
+    def _parse(cls, data: Any|JSONValue, **kwargs: Any) -> T:
         pass
 
     # conversions
 
     @abstractmethod
-    def serialize(self, **kwargs: Any) -> Serialized:
+    def serialize(self, **kwargs: Any) -> JSONValue:
         pass
 
     @classmethod
-    def from_serialized(cls, serialized: Serialized, **kwargs: Any) -> Serializable:
+    def from_serialized(cls, serialized: JSONValue, **kwargs: Any) -> Self:
         return cls(serialized, **kwargs)
 
     # file
@@ -52,6 +52,6 @@ class Serializable[T](ABC):
         JSONFile.write(outfile, serialized)
 
     @classmethod
-    def read(cls, infile: SomePath, **kwargs: Any) -> Serializable:
+    def read(cls, infile: SomePath, **kwargs: Any) -> Self:
         serialized = JSONFile.read(infile)
         return cls.from_serialized(serialized, **kwargs)

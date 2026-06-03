@@ -37,7 +37,7 @@ class TagUtil:
         return unfrozen
 
     @staticmethod
-    def combine(*tagsets: TagsInput):
+    def combine(*tagsets: Tags|TagsInput) -> Tags:
         combined: dict[str, set[str]] = {}
         for tags in tagsets:
             for k, v in tags.items():

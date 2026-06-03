@@ -1,10 +1,10 @@
 # dep
 
-from .serializable import Serializable, Serialized
+from .serializable import JSONValue, Serializable
 
 
 # export
 
 __all__ = [
-    "Serializable", "Serialized"
+    "JSONValue", "Serializable"
 ]

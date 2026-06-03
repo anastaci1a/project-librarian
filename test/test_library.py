@@ -24,12 +24,12 @@ def test_library():
     # - generate [root]/.library/cached.json
 
     # expected progressive executions:
-    # - generate [root]/Untitled/.folder/, /Untitled (2)/, ...
+    # - generate [root]/Untitled (1)/.folder/, /Untitled (2)/, /Untitled (3)/, ...
 
     print(len(lib.folders))
 
-    # expected first execution:        0         (none)
-    # expected progressive executions: 1, 2, ... (/Untitled/, /Untitled (2)/, ...)
+    # expected first execution:        1         (/Untitled/)
+    # expected progressive executions: 2, 3, ... (/Untitled (2)/, /Untitled (3)/, ...)
 
 # main
 

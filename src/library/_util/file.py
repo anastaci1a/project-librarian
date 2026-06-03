@@ -28,7 +28,7 @@ class File:
             numbering_scheme: str = "%s (%d)"
     ):
         test_name, i = proposed_name, 2
-        while (parent_dir / Path(test_name)).is_dir():
+        while (Path(parent_dir) / Path(test_name)).is_dir():
             test_name = numbering_scheme % (proposed_name, i)
             i += 1
         return test_name
