@@ -30,10 +30,10 @@ class FileData:
             proposed_name:    str,
             numbering_scheme: str = "%s (%d)"
     ):
-        test_name, i = proposed_name, 0
+        test_name, i = proposed_name, 2
         while (parent_dir / Path(test_name)).is_dir():
-            i += 1
             test_name = numbering_scheme % (proposed_name, i)
+            i += 1
         return test_name
 
     @classmethod
