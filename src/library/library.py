@@ -58,7 +58,7 @@ class Folder:
     def meta_refresh(self, overwrite: bool = True):
         self._meta = self._meta.get_refreshed(self.path_root)
         if overwrite:
-            pass
+            JSONFile.write(self.path_meta, self.meta.to_dict())
 
     # load/create
 
@@ -82,7 +82,7 @@ class Folder:
             return cls.create(
                 library, Meta(name=folder_name),
 
-                # since no meta exists, renaming is not necessary, overwrite/refreshing is ok
+                # since no meta exists, renaming is not necessary, and overwrite/refreshing is ok
                 rename_folder_collisions=False,
                 allow_overwrite=True,
                 refresh_meta=True
@@ -91,7 +91,13 @@ class Folder:
         # meta exists
         meta_raw = JSONFile.read(path_meta)
         meta = Meta.from_dict(meta_raw)
-        return Folder(library, meta)
+
+        # fix potential folder name mismatch
+        if meta.name != folder_name:
+            meta = replace(meta, name=folder_name)
+            JSONFile.write(path_meta, meta.to_dict())
+
+        return cls(library, meta)
 
     @classmethod
     def create(
@@ -124,17 +130,19 @@ class Folder:
 
         path_meta = path_folder / library.config.folder_meta_json
 
-        # create folder/meta
+        # verify meta nonexistence
         if path_meta.is_file():
             if not allow_overwrite:
                 raise FileExistsError(
                     f"Folder \"{meta.name}\" already exists, and allow_overwrite is disabled."
                 )
 
+        # create folder/meta
         FileData.resolve_parents(path_meta)
         if refresh_meta or meta_not_provided:
             meta = meta.get_refreshed(path_folder)
         JSONFile.write(path_meta, meta.to_dict())
+
         return cls(library, meta)
 
 
@@ -261,36 +269,6 @@ class Library:
                     create_if_missing=create_if_missing
                 )
             )
-
-    def add_folders(
-            self,
-            *folders:        Folder,
-            skip_duplicates: bool = True
-    ):
-        # ensure no duplicates before add
-        if skip_duplicates:
-            folders = [f for f in folders if f not in self._folders]
-        else:
-            for f in folders:
-                if f in self._folders:
-                    raise FileExistsError(f"Folder \"{f.meta.name}\" already exists, and cannot be added again.")
-
-        self._folders.extend(folders)
-        self._uncache_props()
-
-        ### the below process makes less sense now that Folder instances
-        ### must be associated with a Library instance to begin with, so
-        ### reinstantiation is not necessary anymore
-
-        # for f in folders:
-        #     new_folder = Folder.create(
-        #         self._paths.root,
-        #         self._config,
-        #         meta=f.meta
-        #     )
-        #     self._folders.append(new_folder)
-
-        ### TODO: this entire function is not really needed tbh, I more need copy/move_folders
 
     # util
 
