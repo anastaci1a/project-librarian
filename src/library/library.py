@@ -2,15 +2,15 @@
 
 from __future__  import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from functools   import cached_property
 from pathlib     import Path
 
 import os
 
 from .data   import Meta, Tags, TagUtil
-from .config import LibraryConfig
-from .util import JSONFile, SomePath, FileData
+from .config import LibraryConfig, LibraryPaths
+from .util   import JSONFile, SomePath, FileData
 
 
 # folders
@@ -166,15 +166,33 @@ class Library:
         )
         self.folders_rescan(update_meta=update_folder_meta)
 
-    # util
+    # main props
 
-    def _assign_config_and_paths(
-            self,
-            config: LibraryConfig | None,
-            library_root: Path
-    ):
-        self._config = config or LibraryConfig()
-        self._paths = self._config.resolve(library_root)
+    @property
+    def config(self) -> LibraryConfig:
+        return self._config
+
+    @property
+    def paths(self) -> LibraryPaths:
+        return self._paths
+
+    @property
+    def folders(self) -> list[Folder]:
+        return self._folders.copy()
+
+    # computed props
+
+    @cached_property
+    def folder_paths(self) -> list[Path]:
+        return [
+            f.path_root for f in self._folders
+        ]
+
+    @cached_property
+    def tags(self) -> Tags:
+        return TagUtil.combine(*[
+            f.meta.tags for f in self._folders
+        ])
 
     # file init/loading
 
@@ -207,6 +225,8 @@ class Library:
                 self._config.to_dict()
             )
 
+    # <folder>.* mut
+
     def folders_rescan(
             self,
             update_meta: bool = False
@@ -232,23 +252,7 @@ class Library:
         for f in self._folders:
             f.meta_refresh()
 
-    # internal
-
-    @property
-    def folders(self) -> list[Folder]:
-        return self._folders.copy()
-
-    @cached_property
-    def folder_paths(self) -> list[Path]:
-        return [
-            f.path_root for f in self._folders
-        ]
-
-    @cached_property
-    def tags(self) -> Tags:
-        return TagUtil.combine(*[
-            f.meta.tags for f in self._folders
-        ])
+    # self.* mut
 
     def add_folders(
             self,
@@ -263,6 +267,9 @@ class Library:
                 if f in self._folders:
                     raise FileExistsError(f"Folder \"{f.meta.name}\" already exists, and cannot be added again.")
 
+        # # this process makes less sense now that
+        # # Folder instances must be associated with
+        # # a Library instance to begin with
         # for f in folders:
         #     new_folder = Folder.create(
         #         self._paths.root,
@@ -270,9 +277,19 @@ class Library:
         #         meta=f.meta
         #     )
         #     self._folders.append(new_folder)
-        self._folders.extend(folders)
 
+        self._folders.extend(folders)
         self._uncache_props()
+
+    # util
+
+    def _assign_config_and_paths(
+            self,
+            config: LibraryConfig | None,
+            library_root: Path
+    ):
+        self._config = config or LibraryConfig()
+        self._paths = self._config.resolve(library_root)
 
     def _uncache_props(self):
         for d in Library._UNCACHE_ON_UPDATE:
