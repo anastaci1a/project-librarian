@@ -18,8 +18,9 @@ from .util import JSONFile, SomePath, FileData
 class Folder:
     # constr
 
-    def __init__(self, path_root: Path, meta: Meta):
+    def __init__(self, path_root: Path, path_meta: Path, meta: Meta):
         self._path_root = path_root
+        self._path_meta = path_meta
         self._meta = meta
 
     # prop
@@ -38,7 +39,7 @@ class Folder:
 
     @property
     def path_meta(self):
-        return self.path_root / self.meta.relpath_meta
+        return self._path_meta
 
     # sys
 
@@ -77,8 +78,7 @@ class Folder:
                 library_root,
                 library_config=library_config,
                 meta=Meta(
-                    name=folder_name,
-                    relpath_meta=library_config.folder_meta_json
+                    name=folder_name
                 ),
 
                 # no meta exists, collisions/overwrite is ok
@@ -89,7 +89,7 @@ class Folder:
         # meta exists
         meta_raw = JSONFile.read(path_meta)
         meta = Meta.from_dict(meta_raw)
-        return Folder(path_folder, meta)
+        return Folder(path_folder, path_meta, meta)
 
     @classmethod
     def create(
@@ -104,7 +104,6 @@ class Folder:
         meta           = meta or Meta()
         library_config = library_config or LibraryConfig()
         path_folder    = library_root / meta.name
-        path_meta = path_folder / library_config.folder_meta_json
 
         # handle collisions
         if path_folder.is_dir():
@@ -112,15 +111,15 @@ class Folder:
                 # e.g. "Untitled (3)"
                 name_valid = FileData.make_valid_subdir_name(library_root, meta.name)
                 meta = replace(
-                    meta, name=name_valid, relpath_meta=library_config.folder_meta_json
+                    meta, name=name_valid
                 )
-                # redefine:
-                path_folder = library_root / meta.name
-                path_meta = path_folder / library_config.folder_meta_json
+                path_folder = library_root / meta.name # (redefine)
             elif not allow_overwrite:
                 raise FileExistsError(
                     f"Folder \"{meta.name}\" already exists, and rename_collisions and allow_overwrite are disabled."
                 )
+
+        path_meta = path_folder / library_config.folder_meta_json
 
         # create folder/meta
         if path_meta.is_file():
@@ -130,7 +129,7 @@ class Folder:
                 )
 
         JSONFile.write(path_meta, meta.to_dict())
-        return cls(path_folder, meta)
+        return cls(path_folder, path_meta, meta)
 
 
 # library
@@ -242,7 +241,7 @@ class Library:
     @cached_property
     def folder_paths(self) -> list[Path]:
         return [
-            f.meta.path_root for f in self._folders
+            f.path_root for f in self._folders
         ]
 
     @cached_property
