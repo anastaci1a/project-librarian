@@ -1,6 +1,6 @@
 # dep
 
-from __future__  import annotations
+from __future__ import annotations
 
 from dataclasses import replace
 from functools   import cached_property
@@ -9,8 +9,8 @@ from pathlib     import Path
 import os
 
 from .config  import LibraryConfig, LibraryPaths
-from .meta    import Meta, Tags, TagUtil
-from .._util import File, JSONFile, SomePath
+from .data    import Meta, Tags, TagUtil
+from .._util  import File, JSONFile, SomePath
 
 
 # folders

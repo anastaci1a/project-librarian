@@ -11,7 +11,7 @@ from pathlib         import Path
 from types           import MappingProxyType
 from typing          import Any, cast
 
-from .._util import ArgParse, File
+from ..._util import ArgParse, File
 
 
 # tags
