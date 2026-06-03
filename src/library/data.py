@@ -72,9 +72,10 @@ class Meta:
 
     def __key(self) -> tuple:
         return (
-            self.name, self.description,
-            self.tags,
-            self.date_created, self.date_modified,
+            self.name,
+            self.description,
+            self.date_created,
+            self.date_modified,
             self.path_icon
         )
 
