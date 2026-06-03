@@ -11,7 +11,7 @@ from pathlib         import Path
 from types           import MappingProxyType
 from typing          import Any, cast
 
-from .util import ArgParse, FileData
+from .._util import ArgParse, File
 
 
 # tags
@@ -90,9 +90,9 @@ class Meta:
     # copy with modif
 
     def get_refreshed(self, root: Path) -> Meta:
-        date_folder_created    = FileData.get_creation_date(root)
-        date_folder_modified   = FileData.get_date_modified(root)
-        date_children_modified = FileData.get_child_latest_date_modified(root, exclude_dotfiles=True)
+        date_folder_created    = File.get_creation_date(root)
+        date_folder_modified   = File.get_date_modified(root)
+        date_children_modified = File.get_child_latest_date_modified(root, exclude_dotfiles=True)
 
         new_date_created = self.date_created or date_folder_created
         new_date_modified = (

@@ -7,7 +7,7 @@ from pathlib     import Path
 
 import inspect
 
-from .util import SomePath
+from .._util import SomePath
 
 
 # config

@@ -1,6 +1,7 @@
 # dep
 
-from library import *
+from library       import *
+from library._util import * # only for testing
 
 
 # tests
