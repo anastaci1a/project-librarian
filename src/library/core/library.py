@@ -62,7 +62,7 @@ class _Folder:
 
     # meta
 
-    def meta_refresh(self, overwrite: bool = True):
+    def meta_refresh(self, *, overwrite: bool = True):
         self._meta = self._meta.get_refreshed(self.path_root)
         if overwrite:
             JSONFile.write(self.path_meta, self.meta.to_dict())
@@ -83,10 +83,10 @@ class Library:
             self,
             library_root: SomePath,
             config: LibraryConfig | None = None,
-            # ..
+            *,
+            # params:
             config_create_if_missing:   bool = True,
             config_allow_overwrite:     bool = False,
-            # ..
             do_rescan:                  bool = False,
             skip_if_missing_from_cache: bool = True
     ):
@@ -98,9 +98,9 @@ class Library:
 
         config_was_provided = config is not None
         self._init_library(
-            config_was_provided,
-            config_create_if_missing,
-            config_allow_overwrite
+            config_was_provided      = config_was_provided,
+            config_create_if_missing = config_create_if_missing,
+            config_allow_overwrite   = config_allow_overwrite
         )
 
         if do_rescan: self.rescan()
@@ -109,8 +109,8 @@ class Library:
         )
 
     def _init_library(
-            self,
-            # ..
+            self, *,
+            # params:
             config_was_provided:      bool,
             config_create_if_missing: bool,
             config_allow_overwrite:   bool
@@ -182,7 +182,8 @@ class Library:
         self._recache(write_cache_json=False) # tags are not in */cache.json
 
     def rescan(
-            self,
+            self, *,
+            # params:
             create_if_missing: bool = True,
             _recache:          bool = True
     ) -> None:
@@ -201,7 +202,9 @@ class Library:
         )
 
     def _rescan_from_cache(
-            self, skip_if_missing: bool = True
+            self, *,
+            # param(s):
+            skip_if_missing: bool = True
     ) -> None:
         if not self.paths.cached_json.is_file():
             return
@@ -222,10 +225,10 @@ class Library:
 
     def folders_load(
             self, *folder_names: str,
-            # ..
+            # params:
             skip_if_missing:   bool = False,
             create_if_missing: bool = True,
-            # ..
+            # sys:
             _recache:          bool = True
     ) -> None:
         for name in folder_names:
@@ -239,11 +242,11 @@ class Library:
 
     def folders_create(
             self, *metas: Meta | None,
-            # ..
+            # params:
             rename_folder_collisions: bool = True,
             allow_overwrite:          bool = True, # does nothing by default until rename_folder_collisions is disabled
             refresh_meta:             bool = False,
-            # ..
+            # sys:
             _recache:                 bool = True
     ) -> None:
         for meta in metas:
@@ -260,6 +263,7 @@ class Library:
 
     def _folders_add_internal(
             self, *folders: _Folder,
+            # sys:
             _recache: bool = True
     ) -> None:
         self._folders = [
@@ -270,11 +274,11 @@ class Library:
         if _recache: self._recache()
 
     def _folder_load(
-            self, folder_name: str,
-            # ..
+            self, folder_name: str, *,
+            # params:
             skip_if_missing:   bool,
             create_if_missing: bool,
-            # ..
+            # sys:
             _recache:          bool = True
     ) -> None:
         # init config
@@ -319,13 +323,12 @@ class Library:
         )
 
     def _folder_create(
-            self,
-            meta: Meta | None,
-            # ..
+            self, meta: Meta | None, *,
+            # params:
             rename_folder_collisions: bool,
             allow_overwrite:          bool,
             refresh_meta:             bool,
-            # ..
+            # sys:
             _recache:                 bool = True
     ) -> None:
         # init config
@@ -387,7 +390,7 @@ class Library:
             self._paths.cached_json, path_strs
         )
 
-    def _recache(self, write_cache_json: bool = True):
+    def _recache(self, *, write_cache_json: bool = True):
         for d in Library._UNCACHE_ON_UPDATE:
             self.__dict__.pop(d, None)
         if write_cache_json:
