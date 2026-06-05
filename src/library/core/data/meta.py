@@ -136,9 +136,9 @@ class Meta:
 
             **kwargs: Any # allow but ignore extraneous args
     ) -> Meta:
-        def raise_invalid(meta: Any = "UNSET"):
-            if meta != "UNSET":
-                raise ParsingError(f"Invalid metadata: {meta}")
+        def raise_invalid(value: Any = "UNSET"):
+            if value != "UNSET":
+                raise ParsingError(f"Invalid metadata value: {value!r}")
             else:
                 raise ParsingError("Invalid metadata.")
 
@@ -167,7 +167,7 @@ class Meta:
             for k in tags.keys():
                 test_tag = tags.get(k)
                 if not isinstance(test_tag, list|set):
-                    raise_invalid(f"{test_tag} ({k})")
+                    raise_invalid(f"{test_tag!r} ({k!r})")
             tags = {
                 k: {str(s) for s in v}
                 for k, v in tags.items()

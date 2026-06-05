@@ -131,13 +131,17 @@ class Library:
                 to_remove.cached_json.unlink(missing_ok=True) # ..
             else:
                 raise FileExistsError(
-                    f"Attempted to create the configuration file \"{self._paths.config_json}\" which already exists, but config_allow_overwrite was disabled."
+                    f"Attempted to create the configuration file "
+                    f"{self._paths.config_json!r} which already exists, "
+                    f"but config_allow_overwrite was disabled."
                 )
         except FileNotFoundError:
             write_new_config = True # new config if none found
             if not config_create_if_missing:
                 raise FileNotFoundError(
-                    f"Attempted to load the configuration file \"{self._paths.config_json}\" which was not found, but config_create_if_missing was disabled."
+                    f"Attempted to load the configuration file "
+                    f"{self._paths.config_json!r} which was not found, "
+                    f"but config_create_if_missing was disabled."
                 )
 
         if write_new_config: self._write_config()
@@ -294,7 +298,9 @@ class Library:
             if skip_if_missing: return
             if not create_if_missing:
                 raise FileNotFoundError(
-                    f"Attempted to load the folder \"{folder_name}\" which was not found, but skip_if_missing and create_if_missing were disabled."
+                    f"Attempted to load the folder "
+                    f"{folder_name!r} which was not found, "
+                    f"but skip_if_missing and create_if_missing were disabled."
                 )
 
             # init new folder
@@ -338,7 +344,9 @@ class Library:
                 path_folder = self.paths.root / meta.name # (redefine)
             elif not allow_overwrite:
                 raise FileExistsError(
-                    f"Attempted to create the folder \"{meta.name}\" which already exists, but rename_collisions and allow_overwrite were disabled."
+                    f"Attempted to create the folder "
+                    f"{meta.name!r} which already exists, "
+                    f"but rename_collisions and allow_overwrite were disabled."
                 )
 
         path_meta = path_folder / self.config.folder_meta_json
@@ -347,7 +355,9 @@ class Library:
         if path_meta.is_file():
             if not allow_overwrite:
                 raise FileExistsError(
-                    f"Attempted to create the folder \"{meta.name}\" which already exists, but allow_overwrite was disabled."
+                    f"Attempted to create the folder "
+                    f"{meta.name!r} which already exists, "
+                    f"but allow_overwrite was disabled."
                 )
 
         # create folder/meta
