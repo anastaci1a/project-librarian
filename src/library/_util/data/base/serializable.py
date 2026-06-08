@@ -96,10 +96,10 @@ class SerializableCollection[ArgTypes: TypedDict](Serializable[ArgTypes], ABC):
     def __init__(self, data_unparsed: dict[str, Any], **kwargs: Any) -> None:
         super().__init__(data_unparsed, **kwargs)
 
-    # friendly constr :)
+    # factory
 
     @classmethod
-    def new(cls, **data_unparsed_args: Any) -> Self:
+    def create(cls, **data_unparsed_args: Any) -> Self:
         return cls(data_unparsed_args)
 
     # parsing

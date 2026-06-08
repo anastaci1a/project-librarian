@@ -1,5 +1,7 @@
 # dep
 
+from __future__ import annotations
+
 from datetime import datetime
 from os       import PathLike
 from pathlib  import Path
@@ -48,13 +50,13 @@ class Meta(SerializableCollection[MetaTypes]):
 
     @override
     @classmethod
-    def new(
-            cls,
+    def create(
+            cls, *,
             name: str,
             date: str | datetime | DateTimeSerializable,
             path: str | Path | PathSerializable
     ) -> Self:
-        return super().new(
+        return super().create(
             name=name,
             date=date,
             path=path
@@ -69,7 +71,7 @@ def test_serializable():
         "date": datetime.now(), # date
         "path": Path("./")      # path
     }
-    meta = Meta(data)
+    meta = Meta.create(**data)
 
     print(data)      # (unparsed)
     print(meta.data) # expected: dict[str, JSONValue | Serializable]
