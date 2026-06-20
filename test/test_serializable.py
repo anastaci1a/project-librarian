@@ -2,78 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-from os       import PathLike
-from pathlib  import Path
-from typing   import TypedDict, Any, Self, override
-
-from library._util.data.base import * # only for testing
-
-
-# Serializable subclasses
-
-class DateTimeSerializable(Serializable[datetime]):
-    @classmethod
-    def _parse(cls, unparsed: Any | JSONValue, **kwargs: Any) -> datetime:
-        if isinstance(unparsed, str):
-            return datetime.fromisoformat(unparsed)
-        if isinstance(unparsed, datetime):
-            return unparsed
-        print(type(unparsed))
-        raise NotImplementedError
-
-    def serialize(self, **kwargs: Any) -> JSONValue:
-        return self._data.isoformat()
-
-class PathSerializable(Serializable[Path]):
-    @classmethod
-    def _parse(cls, unparsed: Any | JSONValue, **kwargs: Any) -> Path:
-        if isinstance(unparsed, str | PathLike):
-            return Path(unparsed)
-        if isinstance(unparsed, Path):
-            return unparsed
-        raise NotImplementedError
-
-    def serialize(self, **kwargs: Any) -> JSONValue:
-        return str(self._data)
-
-
-# SerializableCollection subclass(es)
-
-class MetaTypes(TypedDict):
-    name: str
-    date: DateTimeSerializable
-    path: PathSerializable
-
-class Meta(SerializableCollection[MetaTypes]):
-    _ArgTypes = MetaTypes
-
-    @override
-    @classmethod
-    def create(
-            cls, *,
-            name: str,
-            date: str | datetime | DateTimeSerializable,
-            path: str | Path | PathSerializable
-    ) -> Self:
-        return super().create(
-            name=name,
-            date=date,
-            path=path
-        )
+from library._util.data import Meta # only for testing
 
 
 # test
 
 def test_serializable():
-    data = {
-        "name": "Test",
-        "date": datetime.now(), # date
-        "path": Path("./")      # path
-    }
-    meta = Meta.create(**data)
+    meta = Meta.create(
+        name="Test"
+    )
 
-    print(data)      # (unparsed)
     print(meta.data) # expected: dict[str, JSONValue | Serializable]
 
 

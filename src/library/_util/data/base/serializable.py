@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc         import ABC, abstractmethod
 from dataclasses import dataclass
-from typing      import Any, ClassVar, Self, TypedDict, Unpack, cast, get_type_hints
+from typing      import Any, ClassVar, Self, TypedDict, TypeGuard, cast, get_type_hints, override
 
 from ...._util.file import JSONFile, SomePath
 
@@ -31,8 +31,8 @@ def is_jsonvalue(value: Any) -> bool:
 
     return False
 
-def is_serializable(t: Any) -> bool:
-    return isinstance(t, type) and issubclass(t, Serializable)
+def is_serializable_type(obj: Any) -> TypeGuard[type[Serializable[Any]]]:
+    return isinstance(obj, type) and issubclass(obj, Serializable)
 
 
 # data
@@ -45,8 +45,12 @@ class Serializable[T](ABC):
 
     # constr
 
-    def __init__(self, unparsed: Any, **kwargs: Any) -> None:
-        self.__dict__["_data"] = self._parse(unparsed, **kwargs)
+    def __init__(
+            self, unparsed: Any, /, **kwargs: Any
+    ) -> None:
+        self.__dict__["_data"] = self._parse(
+            unparsed, **kwargs
+        )
 
     # prop
 
@@ -57,8 +61,9 @@ class Serializable[T](ABC):
     # parsing
 
     @classmethod
-    @abstractmethod
-    def _parse(cls, unparsed: Any, **kwargs: Any) -> T:
+    def _parse(
+            cls, unparsed: Any, /, **kwargs: Any
+    ) -> T:
         raise NotImplementedError
 
     # conversions
@@ -68,17 +73,23 @@ class Serializable[T](ABC):
         raise NotImplementedError
 
     @classmethod
-    def from_serialized(cls, serialized: JSONValue, **kwargs: Any) -> Self:
-        return cls(serialized, **kwargs)
+    def from_serialized(
+            cls, serialized: JSONValue, /,
+            **kwargs: Any
+    ) -> Self:
+        return cls(
+            serialized,
+            **kwargs
+        )
 
     # file
 
-    def write(self, outfile: SomePath, **kwargs: Any) -> None:
+    def write(self, outfile: SomePath, /, **kwargs: Any) -> None:
         serialized = self.serialize(**kwargs)
         JSONFile.write(outfile, serialized)
 
     @classmethod
-    def read(cls, infile: SomePath, **kwargs: Any) -> Self:
+    def read(cls, infile: SomePath, /, **kwargs: Any) -> Self:
         serialized = JSONFile.read(infile)
         return cls.from_serialized(serialized, **kwargs)
 
@@ -86,65 +97,95 @@ class Serializable[T](ABC):
 # collections
 
 @dataclass(frozen=True)
-class SerializableCollection[ArgTypes: TypedDict](Serializable[ArgTypes], ABC):
+class SerializableCollection[DataTypes: TypedDict](Serializable[DataTypes], ABC):
     # const
 
-    _ArgTypes: ClassVar[type[Any]]
+    _DataTypes: ClassVar[type[Any]]
 
     # constr
 
-    def __init__(self, data_unparsed: dict[str, Any], **kwargs: Any) -> None:
+    def __init__(
+            self, data_unparsed: dict[str, Any], /,
+            **kwargs: Any
+    ) -> None:
         super().__init__(data_unparsed, **kwargs)
 
     # factory
 
     @classmethod
-    def create(cls, **data_unparsed_args: Any) -> Self:
-        return cls(data_unparsed_args)
+    def create(
+            cls, **data_unparsed_args: Any
+    ) -> Self:
+        # if ignore_none_args:
+        data_unparsed_args = {
+            k: v
+            for k, v in data_unparsed_args.items()
+            if v is not None # TODO: missing key behavior (1)
+        }
+        return cls(
+            data_unparsed_args
+        )
 
     # parsing
 
+    @override
     @classmethod
-    def _parse(cls, data_unparsed: dict[str, Any], **kwargs: Any) -> ArgTypes:
-        hints = get_type_hints(cls._ArgTypes)
+    def _parse(cls, data_unparsed: dict[str, Any], /, **kwargs: Any) -> DataTypes:
+        hints = get_type_hints(cls._DataTypes)
         data_parsed: dict[str, Any] = {}
 
         for k, expected_type in hints.items():
             if k not in data_unparsed:
-                raise KeyError(
-                    f"Missing required key: {k!r}"
-                )
+                continue # TODO: missing key behavior (2)
 
             raw_value = data_unparsed[k]
 
-            if is_serializable(expected_type):
-                if isinstance(raw_value, expected_type):
-                    data_parsed[k] = raw_value
-                else:
-                    data_parsed[k] = expected_type.from_serialized(raw_value)
-
-            elif is_jsonvalue(raw_value):
-                data_parsed[k] = raw_value
-
-            else:
+            try:
+                data_parsed[k] = cls._parse_raw(
+                    raw_value, expected_type, **kwargs
+                )
+            except TypeError:
                 raise TypeError(
                     f"Field {k!r} cannot be parsed as "
-                    f"{expected_type!r}: {raw_value!r}"
+                    f"{JSONValue!s}: {raw_value!r}"
                 )
 
-        return cast(ArgTypes, data_parsed)
+        return cast(DataTypes, data_parsed)
+
+    @classmethod
+    def _parse_raw[ExpectedType](
+            cls, raw_value: Any,
+            expected_type: type[ExpectedType],
+            /, **kwargs: Any
+    ) -> ExpectedType:
+        if is_serializable_type(expected_type):
+            if isinstance(raw_value, expected_type):
+                return raw_value
+            else:
+                return cast(
+                    ExpectedType,
+                    expected_type.from_serialized(raw_value)
+                )
+
+        if is_jsonvalue(raw_value):
+            return raw_value
+
+        raise TypeError(
+            f"Value {raw_value!r} cannot be parsed as {ExpectedType!r}"
+        )
+
 
     # conversions
 
     def serialize(self, **kwargs: Any) -> JSONValue:
-        hints = get_type_hints(self._ArgTypes)
+        hints = get_type_hints(self._DataTypes)
         data_serialized: dict[str, JSONValue] = {}
 
         for k, expected_type in hints.items():
             raw_value = self._data[k]
 
-            if is_serializable(expected_type):
-                data_serialized[k] = expected_type.serialize(raw_value)
+            if is_serializable_type(expected_type):
+                data_serialized[k] = raw_value.serialize(**kwargs)
 
             elif is_jsonvalue(raw_value):
                 data_serialized[k] = raw_value
