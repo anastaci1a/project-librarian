@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
-from functools   import cached_property
-from pathlib     import Path
+from functools import cached_property
+from pathlib   import Path
 
 import os
 
 from .config  import LibraryConfig, LibraryPaths
-from .data    import Meta, Tags, TagUtil
+# from .data    import Tags, TagUtil
 from .._util  import File, JSONFile, SomePath
+from .._util.data.meta import Meta
 
 
 # folders
@@ -20,7 +20,7 @@ class _Folder:
 
     def __init__(self, library: Library, meta: Meta):
         self._library   = library
-        self._path_root = library.paths.root / meta.name
+        self._path_root = library.paths.root / meta.data["name"]
         self._path_meta = self._path_root / library.config.folder_meta_json
         self._meta      = meta
 
@@ -36,7 +36,7 @@ class _Folder:
 
     @property
     def name(self):
-        return self.meta.name
+        return self.meta.data["name"]
 
     @property
     def path_root(self):
@@ -63,9 +63,9 @@ class _Folder:
     # meta
 
     def meta_refresh(self, *, overwrite: bool = True):
-        self._meta = self._meta.get_refreshed(self.path_root)
+        # self._meta = self._meta.get_refreshed(self.path_root)
         if overwrite:
-            JSONFile.write(self.path_meta, self.meta.to_dict())
+            JSONFile.write(self.path_meta, self.meta.serialize())
 
 
 # library
@@ -168,11 +168,12 @@ class Library:
             Path(f"./{f.name}") for f in self._folders
         ])
 
-    @cached_property
-    def tags(self) -> Tags:
-        return TagUtil.combine(*[
-            f.meta.tags for f in self._folders
-        ])
+    # TODO: reimplement
+    # @cached_property
+    # def tags(self) -> Tags:
+    #     return TagUtil.combine(*[
+    #         f.meta.tags for f in self._folders
+    #     ])
 
     # scanning
 
@@ -288,12 +289,14 @@ class Library:
         if path_meta.is_file():
             # meta exists
             meta_raw = JSONFile.read(path_meta)
-            meta = Meta.from_dict(meta_raw)
+            meta = Meta.from_serialized(meta_raw)
 
             # fix potential folder name mismatch
-            if meta.name != folder_name:
-                meta = replace(meta, name=folder_name)
-                JSONFile.write(path_meta, meta.to_dict())
+            if meta.data["name"] != folder_name:
+                meta = Meta.create(
+                    **(meta.data | {"name": folder_name})
+                )
+                JSONFile.write(path_meta, meta.serialize())
 
             # init loaded folder
             folder = _Folder(self, meta)
@@ -309,7 +312,7 @@ class Library:
 
             # init new folder
             self._folder_create(
-                Meta(name=folder_name),
+                Meta.create(name=folder_name),
 
                 # since no meta exists, renaming is not necessary, and overwrite/refreshing is ok
                 rename_folder_collisions=False,
@@ -333,22 +336,22 @@ class Library:
     ) -> None:
         # init config
         meta_not_provided = meta is None
-        meta = meta or Meta()
-        path_folder = self.paths.root / meta.name
+        meta = meta or Meta.create()
+        path_folder = self.paths.root / meta.data["name"]
 
         # handle collisions
         if path_folder.is_dir():
             if rename_folder_collisions:
                 # e.g. "Untitled (3)"
-                name_valid = File.make_valid_subdir_name(self.paths.root, meta.name)
-                meta = replace(
-                    meta, name=name_valid
+                name_valid = File.make_valid_subdir_name(self.paths.root, meta.data["name"])
+                meta = Meta.create(
+                    **(meta.data | {"name": name_valid})
                 )
-                path_folder = self.paths.root / meta.name # (redefine)
+                path_folder = self.paths.root / meta.data["name"] # (redefine)
             elif not allow_overwrite:
                 raise FileExistsError(
                     f"Attempted to create the folder "
-                    f"{meta.name!r} which already exists, "
+                    f"{meta.data["name"]!r} which already exists, "
                     f"but rename_collisions and allow_overwrite were disabled."
                 )
 
@@ -359,15 +362,19 @@ class Library:
             if not allow_overwrite:
                 raise FileExistsError(
                     f"Attempted to create the folder "
-                    f"{meta.name!r} which already exists, "
+                    f"{meta.data["name"]!r} which already exists, "
                     f"but allow_overwrite was disabled."
                 )
 
         # create folder/meta
         File.resolve_parents(path_meta)
+
+        # TODO: reimplement
         if refresh_meta or meta_not_provided:
-            meta = meta.get_refreshed(path_folder)
-        JSONFile.write(path_meta, meta.to_dict())
+            # meta = meta.get_refreshed(path_folder)
+            pass
+
+        JSONFile.write(path_meta, meta.serialize())
 
         # init/add folder to internal list
         folder = _Folder(self, meta)

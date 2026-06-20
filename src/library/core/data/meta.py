@@ -49,7 +49,7 @@ class TagUtil:
 # meta
 
 @dataclass(frozen=True)
-class Meta:
+class MetaOld:
     # props
 
     name:          str              = "Untitled"
@@ -82,14 +82,14 @@ class Meta:
     def __hash__(self) -> int:
         return hash(self.__key())
 
-    def __eq__(self, other: Meta) -> bool:
-        if isinstance(other, Meta):
+    def __eq__(self, other: MetaOld) -> bool:
+        if isinstance(other, MetaOld):
             return self.__key() == other.__key()
         return NotImplemented
 
     # copy with modif
 
-    def get_refreshed(self, root: Path) -> Meta:
+    def get_refreshed(self, root: Path) -> MetaOld:
         date_folder_created    = File.get_creation_date(root)
         date_folder_modified   = File.get_date_modified(root)
         date_children_modified = File.get_child_latest_date_modified(root, exclude_dotfiles=True)
@@ -121,7 +121,7 @@ class Meta:
         return data
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> Meta:
+    def from_dict(cls, data: dict[str, Any]) -> MetaOld:
         return cls._from_unparsed(**data)
 
     @classmethod
@@ -135,7 +135,7 @@ class Meta:
             path_icon:     Any = None,
 
             **kwargs: Any # allow but ignore extraneous args
-    ) -> Meta:
+    ) -> MetaOld:
         def raise_invalid(value: Any = "UNSET"):
             if value != "UNSET":
                 raise ParsingError(f"Invalid metadata value: {value!r}")

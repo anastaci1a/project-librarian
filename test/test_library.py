@@ -1,5 +1,7 @@
 # dep
 
+from library._util.data import Meta # only for testing
+
 from library import *
 
 
@@ -13,7 +15,7 @@ def test_library():
     # - (nothing else)
 
     lib.folders_create(
-        Meta(),
+        Meta.create(),
         refresh_meta=True,
         rename_folder_collisions=True
     )
@@ -30,6 +32,7 @@ def test_library():
 
     # expected first execution:        1         (/Untitled/)
     # expected progressive executions: 2, 3, ... (/Untitled (2)/, /Untitled (3)/, ...)
+
 
 # main
 

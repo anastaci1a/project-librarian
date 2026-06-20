@@ -182,6 +182,9 @@ class SerializableCollection[DataTypes: TypedDict](Serializable[DataTypes], ABC)
         data_serialized: dict[str, JSONValue] = {}
 
         for k, expected_type in hints.items():
+            if k not in self.data.keys():
+                continue # TODO: missing key behavior (3)
+
             raw_value = self._data[k]
 
             if is_serializable_type(expected_type):
