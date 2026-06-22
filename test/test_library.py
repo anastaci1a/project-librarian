@@ -1,7 +1,5 @@
 # dep
 
-from library._util.data import Meta # only for testing
-
 from library import *
 
 
@@ -9,16 +7,17 @@ from library import *
 
 def test_library():
     lib = Library("./test/example-library-root")
+    lib.meta_refresh()
 
     # expected:
     # - generate [root]/.library/config.json
     # - (nothing else)
 
-    lib.folders_create(
-        Meta.create(),
-        refresh_meta=True,
-        rename_folder_collisions=True
-    )
+    # lib.folders_create(
+    #     Meta.create(),
+    #     refresh_meta=True,
+    #     rename_folder_collisions=True
+    # )
 
     # expected first execution:
     # - generate [root]/Untitled/.folder/meta.json

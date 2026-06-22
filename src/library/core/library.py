@@ -8,9 +8,8 @@ from pathlib   import Path
 import os
 
 from .config  import LibraryConfig, LibraryPaths
-# from .data    import Tags, TagUtil
+from .data    import Meta, Tags, TagUtil
 from .._util  import File, JSONFile, SomePath
-from .._util.data.meta import Meta
 
 
 # folders
@@ -63,7 +62,7 @@ class _Folder:
     # meta
 
     def meta_refresh(self, *, overwrite: bool = True):
-        # self._meta = self._meta.get_refreshed(self.path_root)
+        self._meta = self._meta.get_refreshed(self.path_root)
         if overwrite:
             JSONFile.write(self.path_meta, self.meta.serialize())
 
@@ -368,12 +367,8 @@ class Library:
 
         # create folder/meta
         File.resolve_parents(path_meta)
-
-        # TODO: reimplement
         if refresh_meta or meta_not_provided:
-            # meta = meta.get_refreshed(path_folder)
-            pass
-
+            meta = meta.get_refreshed(path_folder)
         JSONFile.write(path_meta, meta.serialize())
 
         # init/add folder to internal list

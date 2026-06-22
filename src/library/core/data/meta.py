@@ -9,9 +9,10 @@ from datetime        import datetime
 from os              import PathLike
 from pathlib         import Path
 from types           import MappingProxyType
-from typing          import Any, cast
+from typing          import Any, cast, TypedDict, Self, override
 
-from ..._util import ArgParse, File
+from ..._util           import ArgParse, File, SerializableDateTime, SerializablePath
+from ..._util.data.base import SerializableCollection
 
 
 # tags
@@ -47,6 +48,66 @@ class TagUtil:
 
 
 # meta
+
+class MetaData(TypedDict):
+    name:          str
+    description:   str
+    date_created:  SerializableDateTime # TODO: NotRequired[...] support
+    date_modified: SerializableDateTime
+    path_icon:     SerializablePath
+
+class Meta(SerializableCollection[MetaData]):
+    # const
+
+    _DataTypes = MetaData
+
+    # factory
+
+    @override
+    @classmethod
+    def create(
+            cls, *,
+            name:          str = "Untitled",
+            description:   str            | None = None,
+            date_created:  str | datetime | None = None,
+            date_modified: str | datetime | None = None,
+            path_icon:     str | Path     | None = None
+    ) -> Self:
+        date_created  = date_created                  or datetime.now()
+        date_modified = date_modified or date_created or datetime.now()
+
+        return super().create(
+            name=name,
+            description=description,
+            date_created=date_created,
+            date_modified=date_modified,
+            path_icon=path_icon
+        )
+
+    # meta-specific
+
+    def get_refreshed(self, root: Path) -> Meta:
+        date_folder_created    = File.get_creation_date(root)
+        date_folder_modified   = File.get_date_modified(root)
+        date_children_modified = File.get_child_latest_date_modified(root, exclude_dotfiles=True)
+
+        new_date_created = self.data["date_created"] or date_folder_created
+        new_date_modified = (
+                date_children_modified
+                or date_folder_modified
+                or self.data["date_modified"]
+                or self.data["date_created"]
+        )
+
+        return Meta.create(
+            **(self.data | {
+                "date_created":  new_date_created,
+                "date_modified": new_date_modified
+            })
+        )
+
+
+# OLD
 
 @dataclass(frozen=True)
 class MetaOld:

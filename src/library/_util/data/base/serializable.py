@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc         import ABC, abstractmethod
 from dataclasses import dataclass
-from typing      import Any, ClassVar, Self, TypedDict, TypeGuard, cast, get_type_hints, override
+from typing      import Any, ClassVar, Self, TypeGuard, TypedDict, cast, get_args, get_origin, get_type_hints, override
 
 from ...._util.file import JSONFile, SomePath
 
@@ -39,17 +39,41 @@ def is_serializable_type(obj: Any) -> TypeGuard[type[Serializable[Any]]]:
 
 @dataclass(frozen=True)
 class Serializable[T](ABC):
-    # prop
+    # data
 
+    _DataType: ClassVar[Any] = Any
     _data: T
+
+    # infer T
+
+    def __init_subclass__(
+            cls, *,
+            baseclass: type|None = None,
+            **kwargs
+    ) -> None:
+        super().__init_subclass__(**kwargs)
+
+        if baseclass is None:
+            baseclass = Serializable
+
+        for base in getattr(cls, "__orig_bases__", ()):
+            origin = get_origin(base)
+
+            if origin is baseclass:
+                args = get_args(base)
+
+                if len(args) == 1:
+                    cls._DataType = args[0]
+                    return
 
     # constr
 
     def __init__(
             self, unparsed: Any, /, **kwargs: Any
     ) -> None:
-        self.__dict__["_data"] = self._parse(
-            unparsed, **kwargs
+        object.__setattr__(
+            self, "_data",
+            self._parse(unparsed, **kwargs)
         )
 
     # prop
@@ -62,8 +86,22 @@ class Serializable[T](ABC):
 
     @classmethod
     def _parse(
-            cls, unparsed: Any, /, **kwargs: Any
+            cls, unparsed: Any, /,
+            *,
+            allow_instances_of_cls: bool = True,
+            allow_instances_of_T:   bool = True,
+            **kwargs: Any
     ) -> T:
+        if allow_instances_of_cls and isinstance(unparsed, cls):
+            return unparsed.data
+
+        elif allow_instances_of_T:
+            stored_type = cls._DataType
+            runtime_type = get_origin(stored_type) or stored_type
+
+            if isinstance(runtime_type, type) and isinstance(unparsed, runtime_type):
+                return cast(T, unparsed)
+
         raise NotImplementedError
 
     # conversions
@@ -97,10 +135,14 @@ class Serializable[T](ABC):
 # collections
 
 @dataclass(frozen=True)
-class SerializableCollection[DataTypes: TypedDict](Serializable[DataTypes], ABC):
-    # const
+class SerializableCollection[TD: TypedDict](Serializable[TD], ABC):
+    # infer TD
 
-    _DataTypes: ClassVar[type[Any]]
+    def __init_subclass__(cls, **kwargs) -> None:
+        super().__init_subclass__(
+            baseclass=SerializableCollection,
+            **kwargs
+        )
 
     # constr
 
@@ -120,7 +162,7 @@ class SerializableCollection[DataTypes: TypedDict](Serializable[DataTypes], ABC)
         data_unparsed_args = {
             k: v
             for k, v in data_unparsed_args.items()
-            if v is not None # TODO: missing key behavior (1)
+            if v is not None # TODO: required vs optional (1)
         }
         return cls(
             data_unparsed_args
@@ -130,60 +172,78 @@ class SerializableCollection[DataTypes: TypedDict](Serializable[DataTypes], ABC)
 
     @override
     @classmethod
-    def _parse(cls, data_unparsed: dict[str, Any], /, **kwargs: Any) -> DataTypes:
-        hints = get_type_hints(cls._DataTypes)
+    def _parse(cls, unparsed: dict[str, Any], /, **kwargs: Any) -> TD:
+        if isinstance(unparsed, cls):
+            return unparsed.data
+
+        if not isinstance(unparsed, dict):
+            raise TypeError(f"Expected dict or {cls.__name__}, got {type(unparsed).__name__}")
+
+        hints = get_type_hints(cls._DataType)
         data_parsed: dict[str, Any] = {}
 
         for k, expected_type in hints.items():
-            if k not in data_unparsed:
-                continue # TODO: missing key behavior (2)
+            if k not in unparsed:
+                continue # TODO: required vs optional (2)
 
-            raw_value = data_unparsed[k]
+            raw_value = unparsed[k]
 
-            try:
-                data_parsed[k] = cls._parse_raw(
-                    raw_value, expected_type, **kwargs
-                )
-            except TypeError:
-                raise TypeError(
-                    f"Field {k!r} cannot be parsed as "
-                    f"{JSONValue!s}: {raw_value!r}"
-                )
+            data_parsed[k] = cls._parse_raw(
+                raw_value, expected_type, **kwargs
+            )
 
-        return cast(DataTypes, data_parsed)
+        return cast(TD, data_parsed)
 
     @classmethod
     def _parse_raw[ExpectedType](
-            cls, raw_value: Any,
-            expected_type: type[ExpectedType],
-            /, **kwargs: Any
+            cls,
+            raw_value: Any,
+            expected_type: Any,
+            /,
+            **kwargs: Any
     ) -> ExpectedType:
+        # attempt native Serializable parsing
         if is_serializable_type(expected_type):
-            if isinstance(raw_value, expected_type):
-                return raw_value
-            else:
-                return cast(
-                    ExpectedType,
-                    expected_type.from_serialized(raw_value)
-                )
+            return expected_type.from_serialized(raw_value)
 
+        # basic jsonval
+        if expected_type is JSONValue:
+            if is_jsonvalue(raw_value):
+                return cast(ExpectedType, raw_value)
+
+            raise TypeError(
+                f"Value {raw_value!r} "
+                f"is not JSON-serializable"
+            )
+
+        # other expected types
+        if isinstance(expected_type, type):
+            if isinstance(raw_value, expected_type):
+                return cast(ExpectedType, raw_value)
+
+            raise TypeError(
+                f"Value {raw_value!r} "
+                f"is not an instance of {expected_type!r}"
+            )
+
+        # not-expected jsonval
         if is_jsonvalue(raw_value):
-            return raw_value
+            return cast(ExpectedType, raw_value)
 
         raise TypeError(
-            f"Value {raw_value!r} cannot be parsed as {ExpectedType!r}"
+            f"Value {raw_value!r} "
+            f"cannot be parsed as {expected_type!r}"
         )
-
 
     # conversions
 
     def serialize(self, **kwargs: Any) -> JSONValue:
-        hints = get_type_hints(self._DataTypes)
+        hints = get_type_hints(self._DataType)
         data_serialized: dict[str, JSONValue] = {}
 
         for k, expected_type in hints.items():
             if k not in self.data.keys():
-                continue # TODO: missing key behavior (3)
+                continue # TODO: required vs optional (3)
 
             raw_value = self._data[k]
 

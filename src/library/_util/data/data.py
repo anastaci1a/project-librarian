@@ -18,7 +18,7 @@ class SerializableDateTime(Serializable[datetime]):
     def _parse(cls, unparsed: Any | JSONValue, **kwargs: Any) -> datetime:
         if isinstance(unparsed, str):
             return datetime.fromisoformat(unparsed)
-        raise NotImplementedError
+        return super()._parse(unparsed, **kwargs)
 
     @override
     def serialize(self, **kwargs: Any) -> JSONValue:
@@ -32,7 +32,7 @@ class SerializablePath(Serializable[Path]):
     def _parse(cls, unparsed: Any | JSONValue, **kwargs: Any) -> Path:
         if isinstance(unparsed, str | PathLike):
             return Path(unparsed)
-        raise NotImplementedError
+        return super()._parse(unparsed, **kwargs)
 
     @override
     def serialize(self, **kwargs: Any) -> JSONValue:
