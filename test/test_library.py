@@ -13,15 +13,15 @@ def test_library():
     # - generate [root]/.library/config.json
     # - (nothing else)
 
-    # lib.folders_create(
-    #     Meta.create(),
-    #     refresh_meta=True,
-    #     rename_folder_collisions=True
-    # )
+    lib.folders_create(
+        Meta.create(tags={"Label": {"Cool Projects"}}),
+        refresh_meta=True,
+        rename_folder_collisions=True
+    )
 
     # expected first execution:
     # - generate [root]/Untitled/.folder/meta.json
-    #   - (has date_created and date_modified)
+    #   - (has name, tags, date_created, date_modified)
     # - generate [root]/.library/cached.json
 
     # expected progressive executions:

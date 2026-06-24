@@ -158,7 +158,6 @@ class SerializableCollection[TD: TypedDict](Serializable[TD], ABC):
     def create(
             cls, **data_unparsed_args: Any
     ) -> Self:
-        # if ignore_none_args:
         data_unparsed_args = {
             k: v
             for k, v in data_unparsed_args.items()

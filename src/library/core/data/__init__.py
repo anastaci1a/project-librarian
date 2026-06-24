@@ -1,10 +1,12 @@
 # dep
 
-from .meta import Meta, Tags, TagsInput, TagUtil
+from .meta import Meta
+from .tags import Tags, TagsInput
 
 
 # export
 
 __all__ = [
-    "Meta", "Tags", "TagsInput", "TagUtil"
+    "Meta",
+    "Tags", "TagsInput"
 ]

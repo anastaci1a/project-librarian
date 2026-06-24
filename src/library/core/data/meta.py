@@ -2,59 +2,42 @@
 
 from __future__  import annotations
 
-from collections.abc import Mapping
-from configparser    import ParsingError
-from dataclasses     import dataclass, field, replace
-from datetime        import datetime
-from os              import PathLike
-from pathlib         import Path
-from types           import MappingProxyType
-from typing          import Any, cast, TypedDict, Self, override
+from copy     import deepcopy
+from datetime import datetime
+from pathlib  import Path
+from typing   import TypedDict, override, Self, Any
 
-from ..._util           import ArgParse, File, SerializableDateTime, SerializablePath
+from .tags import TagsInput, Tags
+
+from ..._util           import File, SerializableDateTime, SerializablePath
 from ..._util.data.base import SerializableCollection
 
 
-# tags
-
-type Tags      = Mapping[str, frozenset[str]]
-type TagsInput = Mapping[str, set[str]]
-
-class TagUtil:
-    @staticmethod
-    def freeze(tags: TagsInput | None = None) -> Tags:
-        frozen: dict[str, frozenset[str]] = {
-            str(k): frozenset(str(tag) for tag in v)
-            for k, v in (tags or {}).items()
-        }
-        return cast(Tags, MappingProxyType(frozen))
-
-    @staticmethod
-    def serialize(tags: Tags) -> dict[str, list[str]]:
-        unfrozen: dict[str, list[str]] = {
-            k: sorted([str(s) for s in v])
-            for k, v in tags.items()
-        }
-        return unfrozen
-
-    @staticmethod
-    def combine(*tagsets: Tags|TagsInput) -> Tags:
-        combined: dict[str, set[str]] = {}
-        for tags in tagsets:
-            for k, v in tags.items():
-                combined.setdefault(k, set())
-                combined[k].update(v)
-        return TagUtil.freeze(combined)
-
-
-# meta
+# data
 
 class MetaData(TypedDict):
     name:          str
     description:   str
+    tags:          Tags
     date_created:  SerializableDateTime # TODO: NotRequired[...] support
     date_modified: SerializableDateTime
     path_icon:     SerializablePath
+
+META_ARGS_DEFAULT = {
+    "name": "Untitled",
+    "tags": {},
+    "date_created":  lambda : datetime.now(),
+    "date_modified": lambda : datetime.now()
+}
+
+def _get_meta_args_default() -> dict[str, Any]:
+    return {
+        k: v() if callable(v) else deepcopy(v)
+        for k, v in META_ARGS_DEFAULT.items()
+    }
+
+
+# meta
 
 class Meta(SerializableCollection[MetaData]):
     # const
@@ -66,23 +49,31 @@ class Meta(SerializableCollection[MetaData]):
     @override
     @classmethod
     def create(
-            cls, *,
-            name:          str = "Untitled",
+            cls,
+            *,
+            name:          str            | None = None,
             description:   str            | None = None,
+            tags:          TagsInput      | None = None,
             date_created:  str | datetime | None = None,
             date_modified: str | datetime | None = None,
             path_icon:     str | Path     | None = None
     ) -> Self:
-        date_created  = date_created                  or datetime.now()
-        date_modified = date_modified or date_created or datetime.now()
+        provided = {
+            "name":          name,
+            "description":   description,
+            "tags":          tags,
+            "date_created":  date_created,
+            "date_modified": date_modified or date_created,
+            "path_icon":     path_icon
+        }
 
-        return super().create(
-            name=name,
-            description=description,
-            date_created=date_created,
-            date_modified=date_modified,
-            path_icon=path_icon
-        )
+        kwargs = _get_meta_args_default() | {
+            k: v
+            for k, v in provided.items()
+            if v is not None
+        }
+
+        return super().create(**kwargs)
 
     # meta-specific
 
@@ -105,146 +96,3 @@ class Meta(SerializableCollection[MetaData]):
                 "date_modified": new_date_modified
             })
         )
-
-
-# OLD
-
-@dataclass(frozen=True)
-class MetaOld:
-    # props
-
-    name:          str              = "Untitled"
-    description:   str              = ""
-    tags:          Tags | TagsInput = field(default_factory=dict)
-    date_created:  datetime | None  = None
-    date_modified: datetime | None  = None
-    path_icon:     Path     | None  = None
-
-    # init (freeze attrs)
-
-    def __post_init__(self):
-        object.__setattr__(
-            self,
-            "tags",
-            TagUtil.freeze(self.tags)
-        )
-
-    # sys
-
-    def __key(self) -> tuple:
-        return (
-            self.name,
-            self.description,
-            self.date_created,
-            self.date_modified,
-            self.path_icon
-        )
-
-    def __hash__(self) -> int:
-        return hash(self.__key())
-
-    def __eq__(self, other: MetaOld) -> bool:
-        if isinstance(other, MetaOld):
-            return self.__key() == other.__key()
-        return NotImplemented
-
-    # copy with modif
-
-    def get_refreshed(self, root: Path) -> MetaOld:
-        date_folder_created    = File.get_creation_date(root)
-        date_folder_modified   = File.get_date_modified(root)
-        date_children_modified = File.get_child_latest_date_modified(root, exclude_dotfiles=True)
-
-        new_date_created = self.date_created or date_folder_created
-        new_date_modified = (
-                date_children_modified
-                or date_folder_modified
-                or self.date_modified
-                or self.date_created
-        )
-
-        return replace(
-            self,
-            date_created  = new_date_created,
-            date_modified = new_date_modified
-        )
-
-    # method
-
-    def to_dict(self) -> dict:
-        data = self.__dict__.copy()
-        for k in ("date_created", "date_modified", "path_icon"):
-            if data[k] is None:
-                data.pop(k); continue
-            data[k] = str(data.get(k))
-        data["tags"] = TagUtil.serialize(data["tags"])
-
-        return data
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> MetaOld:
-        return cls._from_unparsed(**data)
-
-    @classmethod
-    def _from_unparsed(
-            cls,
-            name:          Any = None,
-            description:   Any = None,
-            tags:          Any = None,
-            date_created:  Any = None,
-            date_modified: Any = None,
-            path_icon:     Any = None,
-
-            **kwargs: Any # allow but ignore extraneous args
-    ) -> MetaOld:
-        def raise_invalid(value: Any = "UNSET"):
-            if value != "UNSET":
-                raise ParsingError(f"Invalid metadata value: {value!r}")
-            else:
-                raise ParsingError("Invalid metadata.")
-
-        # str/date type checking
-
-        for test_str in (
-            name, description
-        ):
-            if not isinstance(test_str, str|None):
-                raise_invalid(test_str)
-
-        if not isinstance(path_icon, str|PathLike|None):
-            raise_invalid(path_icon)
-
-        for test_date in (
-            date_created, date_modified
-        ):
-            if not isinstance(test_date, str|datetime|None):
-                raise_invalid(test_date)
-
-        # tags type checking / initial parsing
-
-        if not isinstance(tags, dict|None):
-            raise_invalid(str(tags))
-        if tags is not None:
-            for k in tags.keys():
-                test_tag = tags.get(k)
-                if not isinstance(test_tag, list|set):
-                    raise_invalid(f"{test_tag!r} ({k!r})")
-            tags = {
-                k: {str(s) for s in v}
-                for k, v in tags.items()
-            }
-
-        # final parsing
-
-        args_parsed = {
-            "name":          ArgParse.str_or_none(name),
-            "description":   ArgParse.str_or_none(description),
-            "tags":          tags,
-            "date_created":  ArgParse.datetime_or_none(date_created),
-            "date_modified": ArgParse.datetime_or_none(date_modified),
-            "path_icon":     ArgParse.path_or_none(path_icon)
-        }
-
-        return cls(**{
-            k: v for k, v in args_parsed.items() if v is not None
-        })

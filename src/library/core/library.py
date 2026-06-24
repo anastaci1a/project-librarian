@@ -8,7 +8,7 @@ from pathlib   import Path
 import os
 
 from .config  import LibraryConfig, LibraryPaths
-from .data    import Meta, Tags, TagUtil
+from .data    import Meta, Tags
 from .._util  import File, JSONFile, SomePath
 
 
