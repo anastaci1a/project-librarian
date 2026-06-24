@@ -8,13 +8,13 @@ from library import *
 def test_tags():
     print("TAG TEST")
 
-    combined_immut = TagUtil.combine(
+    combined_immut = Tags.combine(
             {"Category": {"Package"}, "Language": {"Java"}},
             {"Category": {"Mobile"}, "Language": {"Kotlin"}},
             {"Category": {"Web"}, "Language": {"HTML", "Typescript"}}
     )
-    print("1:", TagUtil.serialize(combined_immut))
-    # expected: {"Category": {"Mobile", "Package", "Web"}, "Language": {"HTML", "Java", "Kotlin", "Typescript"}}
+    print("1:", combined_immut.serialize())
+    # expected: {"Category": ["Mobile", "Package", "Web"], "Language": ["HTML", "Java", "Kotlin", "Typescript"]}
 
 
 # main

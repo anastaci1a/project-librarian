@@ -14,18 +14,21 @@ def test_library():
     # - (nothing else)
 
     lib.folders_create(
-        Meta.create(tags={"Label": {"Cool Projects"}}),
+        Meta.create(
+            name="My Folder",
+            tags={"Label": {"Cool Projects"}}
+        ),
         refresh_meta=True,
         rename_folder_collisions=True
     )
 
     # expected first execution:
-    # - generate [root]/Untitled/.folder/meta.json
+    # - generate [root]/My Folder/.folder/meta.json
     #   - (has name, tags, date_created, date_modified)
     # - generate [root]/.library/cached.json
 
     # expected progressive executions:
-    # - generate [root]/Untitled (1)/.folder/, /Untitled (2)/, /Untitled (3)/, ...
+    # - generate [root]/My Folder (1)/.folder/, /My Folder (2)/, /My Folder (3)/, ...
 
     print(len(lib.folders))
 

@@ -1,8 +1,6 @@
 # dep
 
-from __future__ import annotations
-
-from library._util.data import Meta # only for testing
+from library import Meta
 
 
 # test
