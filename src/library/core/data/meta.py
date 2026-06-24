@@ -5,7 +5,7 @@ from __future__  import annotations
 from copy     import deepcopy
 from datetime import datetime
 from pathlib  import Path
-from typing   import TypedDict, override, Self, Any
+from typing import TypedDict, override, Self, Any, NotRequired
 
 from .tags import TagsInput, Tags
 
@@ -17,23 +17,21 @@ from ..._util.data.base import SerializableCollection
 
 class MetaData(TypedDict):
     name:          str
-    description:   str
     tags:          Tags
-    date_created:  SerializableDateTime # TODO: NotRequired[...] support
+    date_created:  SerializableDateTime
     date_modified: SerializableDateTime
-    path_icon:     SerializablePath
 
-META_ARGS_DEFAULT = {
-    "name": "Untitled",
-    "tags": {},
-    "date_created":  lambda : datetime.now(),
-    "date_modified": lambda : datetime.now()
-}
+    description:   NotRequired[str]
+    path_icon:     NotRequired[SerializablePath]
 
 def _get_meta_args_default() -> dict[str, Any]:
+    now = datetime.now()
+
     return {
-        k: v() if callable(v) else deepcopy(v)
-        for k, v in META_ARGS_DEFAULT.items()
+        "name": "Untitled",
+        "tags": {},
+        "date_created": now,
+        "date_modified": now,
     }
 
 
@@ -63,7 +61,7 @@ class Meta(SerializableCollection[MetaData]):
             "description":   description,
             "tags":          tags,
             "date_created":  date_created,
-            "date_modified": date_modified or date_created,
+            "date_modified": date_modified if date_modified is not None else date_created,
             "path_icon":     path_icon
         }
 
@@ -72,6 +70,8 @@ class Meta(SerializableCollection[MetaData]):
             for k, v in provided.items()
             if v is not None
         }
+
+        print(kwargs)
 
         return super().create(**kwargs)
 

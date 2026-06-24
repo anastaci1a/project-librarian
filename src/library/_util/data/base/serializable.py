@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from abc         import ABC, abstractmethod
 from dataclasses import dataclass
-from typing      import Any, ClassVar, Self, TypeGuard, TypedDict, cast, get_args, get_origin, get_type_hints, override
+from typing      import Any, ClassVar, NotRequired, Required, Self, TypeGuard, TypedDict, \
+                        cast, get_args, get_origin, get_type_hints, override
 
 from ...._util.file import JSONFile, SomePath
 
@@ -33,6 +34,27 @@ def is_jsonvalue(value: Any) -> bool:
 
 def is_serializable_type(obj: Any) -> TypeGuard[type[Serializable[Any]]]:
     return isinstance(obj, type) and issubclass(obj, Serializable)
+
+def get_required_typed_dict_keys(td_type: type) -> frozenset[str]:
+    hints = get_type_hints(td_type, include_extras=True)
+    total = getattr(td_type, "__total__", True)
+
+    required: set[str] = set()
+
+    for key, hint in hints.items():
+        origin = get_origin(hint)
+
+        if origin is NotRequired:
+            continue
+
+        if origin is Required:
+            required.add(key)
+            continue
+
+        if total:
+            required.add(key)
+
+    return frozenset(required)
 
 
 # data
@@ -176,19 +198,31 @@ class SerializableCollection[TD: TypedDict](Serializable[TD], ABC):
             return unparsed.data
 
         if not isinstance(unparsed, dict):
-            raise TypeError(f"Expected dict or {cls.__name__}, got {type(unparsed).__name__}")
+            raise TypeError(
+                f"Expected dict or {cls.__name__}, got {type(unparsed).__name__}"
+            )
 
         hints = get_type_hints(cls._DataType)
+        required_keys = get_required_typed_dict_keys(cls._DataType)
+
+        missing = required_keys - unparsed.keys()
+        if missing:
+            raise TypeError(
+                f"Missing required field(s) for {cls.__name__}: {sorted(missing)}"
+            )
+
         data_parsed: dict[str, Any] = {}
 
         for k, expected_type in hints.items():
             if k not in unparsed:
-                continue # TODO: required vs optional (2)
+                continue
 
             raw_value = unparsed[k]
 
             data_parsed[k] = cls._parse_raw(
-                raw_value, expected_type, **kwargs
+                raw_value,
+                expected_type,
+                **kwargs
             )
 
         return cast(TD, data_parsed)
@@ -203,7 +237,7 @@ class SerializableCollection[TD: TypedDict](Serializable[TD], ABC):
     ) -> ExpectedType:
         # attempt native Serializable parsing
         if is_serializable_type(expected_type):
-            return expected_type.from_serialized(raw_value)
+            return expected_type(raw_value)
 
         # basic jsonval
         if expected_type is JSONValue:

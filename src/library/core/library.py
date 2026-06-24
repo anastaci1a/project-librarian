@@ -316,7 +316,9 @@ class Library:
                 # since no meta exists, renaming is not necessary, and overwrite/refreshing is ok
                 rename_folder_collisions=False,
                 allow_overwrite=True,
-                refresh_meta=True
+                refresh_meta=True,
+
+                _recache=_recache,
             ); return
 
         # add folder to internal list
