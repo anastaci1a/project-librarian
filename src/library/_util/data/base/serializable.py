@@ -289,7 +289,7 @@ class SerializableCollection[TD: TypedDict](Serializable[TD], ABC):
 
         for k, expected_type in hints.items():
             if k not in self.data.keys():
-                continue # TODO: required vs optional (3)
+                continue
 
             raw_value = self._data[k]
 

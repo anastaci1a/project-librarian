@@ -227,8 +227,8 @@ class Library:
     def folders_load(
             self, *folder_names: str,
             # params:
-            skip_if_missing:   bool = False,
-            create_if_missing: bool = True,
+            skip_if_missing:   bool = True,
+            create_if_missing: bool = False,
             # sys:
             _recache:          bool = True
     ) -> None:
