@@ -167,12 +167,11 @@ class Library:
             Path(f"./{f.name}") for f in self._folders
         ])
 
-    # TODO: reimplement
-    # @cached_property
-    # def tags(self) -> Tags:
-    #     return TagUtil.combine(*[
-    #         f.meta.tags for f in self._folders
-    #     ])
+    @cached_property
+    def tags(self) -> Tags:
+        return Tags.combine(*[
+            f.meta.data["tags"] for f in self._folders
+        ])
 
     # scanning
 
