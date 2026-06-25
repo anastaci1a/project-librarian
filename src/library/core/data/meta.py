@@ -2,10 +2,9 @@
 
 from __future__  import annotations
 
-from copy     import deepcopy
 from datetime import datetime
 from pathlib  import Path
-from typing import TypedDict, override, Self, Any, NotRequired
+from typing   import Any, NotRequired, Self, TypedDict, override
 
 from .tags import TagsInput, Tags
 
@@ -70,8 +69,6 @@ class Meta(SerializableCollection[MetaData]):
             for k, v in provided.items()
             if v is not None
         }
-
-        print(kwargs)
 
         return super().create(**kwargs)
 
