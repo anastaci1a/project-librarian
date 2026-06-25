@@ -75,8 +75,7 @@ class Serializable[T](ABC):
     ) -> None:
         super().__init_subclass__(**kwargs)
 
-        if baseclass is None:
-            baseclass = Serializable
+        baseclass = Serializable if baseclass is None else baseclass
 
         for base in getattr(cls, "__orig_bases__", ()):
             origin = get_origin(base)
@@ -158,11 +157,17 @@ class Serializable[T](ABC):
 
 @dataclass(frozen=True)
 class SerializableCollection[TD: TypedDict](Serializable[TD], ABC):
-    # infer TD
+    # init (infer TD)
 
-    def __init_subclass__(cls, **kwargs) -> None:
+    def __init_subclass__(
+            cls, *,
+            baseclass: type|None = None,
+            **kwargs
+    ) -> None:
+        baseclass = SerializableCollection if baseclass is None else baseclass
+
         super().__init_subclass__(
-            baseclass=SerializableCollection,
+            baseclass=baseclass,
             **kwargs
         )
 
