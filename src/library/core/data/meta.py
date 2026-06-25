@@ -51,7 +51,7 @@ class Meta(SerializableCollection[MetaData]):
             date_modified: str | datetime | None = None,
             path_icon:     str | Path     | None = None
     ) -> Self:
-        provided = {
+        kwargs = {
             "name":          name,
             "description":   description,
             "tags":          tags,
@@ -60,13 +60,10 @@ class Meta(SerializableCollection[MetaData]):
             "path_icon":     path_icon
         }
 
-        kwargs = _get_meta_args_default() | {
-            k: v
-            for k, v in provided.items()
-            if v is not None
-        }
-
-        return super().create(**kwargs)
+        return super().create(
+            **kwargs,
+            args_defaults=_get_meta_args_default()
+        )
 
     # meta-specific
 

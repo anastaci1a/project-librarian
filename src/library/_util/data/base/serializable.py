@@ -183,13 +183,21 @@ class SerializableCollection[TD: TypedDict](Serializable[TD], ABC):
 
     @classmethod
     def create(
-            cls, **data_unparsed_args: Any
+            cls, *,
+            ignore_none_args:     bool = True,
+            args_defaults: None | dict = None,
+            **data_unparsed_args: Any
     ) -> Self:
-        data_unparsed_args = {
-            k: v
-            for k, v in data_unparsed_args.items()
-            if v is not None # TODO: required vs optional (1)
-        }
+        if ignore_none_args:
+            data_unparsed_args = {
+                k: v
+                for k, v in data_unparsed_args.items()
+                if v is not None
+            }
+
+        if args_defaults is not None:
+            data_unparsed_args = args_defaults | data_unparsed_args
+
         return cls(
             data_unparsed_args
         )

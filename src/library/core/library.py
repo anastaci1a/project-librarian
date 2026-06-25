@@ -116,7 +116,7 @@ class Library:
     ) -> None:
         try:
             config_found_dict = JSONFile.read(self._paths.config_json)
-            config_found = LibraryConfig.from_dict(config_found_dict)
+            config_found = LibraryConfig.from_serialized(config_found_dict)
 
             if not config_was_provided or config_found == self._config:
                 # use existing config
@@ -386,7 +386,7 @@ class Library:
     def _write_config(self):
         JSONFile.write(
             self._paths.config_json,
-            self._config.to_dict()
+            self._config.serialize()
         )
 
     def _write_cache(self):
@@ -406,5 +406,5 @@ class Library:
             config: LibraryConfig | None,
             library_root: Path
     ):
-        self._config = config or LibraryConfig()
+        self._config = config or LibraryConfig.create()
         self._paths = self._config.resolve(library_root)

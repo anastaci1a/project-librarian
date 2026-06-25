@@ -4,21 +4,69 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib     import Path
+from typing      import Self, TypedDict, override
 
-import inspect
+from .._util           import SerializablePath, SomePath
+from .._util.data.base import SerializableCollection
 
-from .._util import SomePath
+
+# data
+
+class LibraryConfigData(TypedDict):
+    config_json:      SerializablePath
+    cached_json:      SerializablePath
+    folder_meta_json: SerializablePath
+
+def _get_config_args_default():
+    return {
+        "config_json":      ".library/config.json",
+        "cached_json":      ".library/cached.json",
+        "folder_meta_json": ".folder/meta.json"
+    }
 
 
-# config
+# library config
 
-@dataclass(frozen=True)
-class LibraryConfig:
-    # attrs
+class LibraryConfig(SerializableCollection[LibraryConfigData]):
+    # const
 
-    config_json:      Path = Path(".library/config.json")
-    cached_json:      Path = Path(".library/cached.json")
-    folder_meta_json: Path = Path(".folder/meta.json")
+    _DataTypes = LibraryConfigData
+
+    # factory
+
+    @override
+    @classmethod
+    def create(
+            cls,
+            *,
+            config_json:      SomePath | None = None,
+            cached_json:      SomePath | None = None,
+            folder_meta_json: SomePath | None = None
+    ) -> Self:
+        kwargs = {
+            "config_json":      config_json,
+            "cached_json":      cached_json,
+            "folder_meta_json": folder_meta_json
+        }
+
+        return super().create(
+            **kwargs,
+            args_defaults=_get_config_args_default()
+        )
+
+    # ez props
+
+    @property
+    def config_json(self) -> Path:
+        return self.data["config_json"].data
+
+    @property
+    def cached_json(self) -> Path:
+        return self.data["cached_json"].data
+
+    @property
+    def folder_meta_json(self) -> Path:
+        return self.data["folder_meta_json"].data
 
     # sys
 
@@ -36,20 +84,7 @@ class LibraryConfig:
             return self.__key() == other.__key()
         return NotImplemented
 
-    # method
-
-    def to_dict(self) -> dict[str, str]:
-        r = self.__dict__.copy()
-        for k in r.keys():
-            r[k] = str(r[k])
-        return r
-
-    @classmethod
-    def from_dict(cls, config: dict[str, str]) -> LibraryConfig:
-        keys = dict(inspect.getmembers(cls))["__dataclass_fields__"].keys()
-        return cls(**{
-            k: Path(v) for k, v in config.items() if k in keys and v is not None
-        })
+    # paths
 
     def resolve(self, library_root: SomePath) -> LibraryPaths:
         return LibraryPaths(Path(library_root), self)
