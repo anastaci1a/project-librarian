@@ -37,10 +37,6 @@ def _get_meta_args_default() -> dict[str, Any]:
 # meta
 
 class Meta(SerializableCollection[MetaData]):
-    # const
-
-    _DataTypes = MetaData
-
     # factory
 
     @override

@@ -59,7 +59,7 @@ class LibraryConfig:
 
 @dataclass(frozen=True)
 class LibraryPaths:
-    root: Path
+    root:   Path
     config: LibraryConfig
 
     @property

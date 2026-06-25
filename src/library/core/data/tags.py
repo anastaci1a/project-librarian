@@ -25,7 +25,6 @@ def is_tagsinput(value: Any) -> TypeGuard[TagsInput]:
     )
 
 
-
 # tags
 
 class Tags(Serializable[TagsData]):
