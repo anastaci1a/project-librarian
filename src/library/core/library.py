@@ -183,7 +183,8 @@ class Library:
     def rescan(
             self, *,
             # params:
-            create_if_missing: bool = True,
+            skip_if_missing:   bool = False,
+            create_if_missing: bool = False,
             _recache:          bool = True
     ) -> None:
         self._folders.clear()
@@ -196,6 +197,7 @@ class Library:
         self.folders_load(
             *folder_names,
 
+            skip_if_missing=skip_if_missing,
             create_if_missing=create_if_missing,
             _recache=_recache
         )
