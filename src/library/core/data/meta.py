@@ -8,7 +8,7 @@ from typing   import Any, NotRequired, Self, TypedDict, override
 
 from .tags import TagsInput, Tags
 
-from ..._util           import File, SerializableDateTime, SerializablePath
+from ..._util           import FileSystem, SerializableDateTime, SerializablePath
 from ..._util.data.base import SerializableCollection
 
 
@@ -76,8 +76,8 @@ class Meta(SerializableCollection[MetaData]):
 
     def get_refreshed(self, root: Path) -> Self:
         date_modified = (
-            File.get_child_latest_date_modified(root, exclude_dotfiles=True)
-            or File.get_date_modified(root)
+                FileSystem.get_child_latest_date_modified(root, exclude_dotfiles=True)
+                or FileSystem.get_date_modified(root)
         )
         date_created = min(
             self.data["date_created"].data,

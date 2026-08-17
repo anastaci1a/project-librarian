@@ -2,7 +2,7 @@
 
 from .cli   import Ansi, Cli
 from .data  import SerializableDateTime, SerializablePath
-from .file  import File, JSONFile, SomePath
+from .file  import FileSystem, JSONFile, SomePath
 from .parse import ArgParse
 
 
@@ -11,6 +11,6 @@ from .parse import ArgParse
 __all__ = [
     "Ansi", "Cli",
     "SerializableDateTime", "SerializablePath",
-    "File", "JSONFile", "SomePath",
+    "FileSystem", "JSONFile", "SomePath",
     "ArgParse"
 ]

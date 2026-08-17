@@ -9,7 +9,7 @@ import os
 
 from .config  import LibraryConfig, LibraryPaths
 from .data    import Meta, Tags
-from .._util  import File, JSONFile, SomePath
+from .._util  import FileSystem, JSONFile, SomePath
 
 
 # folders
@@ -364,7 +364,7 @@ class Library:
         if path_folder.is_dir():
             if folder_rename_collisions:
                 # e.g. "Untitled (3)"
-                name_valid = File.make_valid_subdir_name(self.paths.root, meta.data["name"])
+                name_valid = FileSystem.make_valid_subdir_name(self.paths.root, meta.data["name"])
                 meta = Meta.create(
                     **(meta.data | {"name": name_valid})
                 )
@@ -388,7 +388,7 @@ class Library:
                 )
 
         # create folder/meta
-        File.resolve_parents(path_meta)
+        FileSystem.resolve_parents(path_meta)
         if refresh_meta or meta_not_provided:
             meta = meta.get_refreshed(path_folder)
         JSONFile.write(path_meta, meta.serialize())

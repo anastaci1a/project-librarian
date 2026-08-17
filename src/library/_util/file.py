@@ -19,7 +19,7 @@ type SomePath = str | PathLike[str]
 
 # generic file/folder utils / data collection
 
-class File:
+class FileSystem:
     @classmethod
     def make_valid_subdir_name(
             cls,
@@ -90,7 +90,7 @@ class JSONFile:
     ) -> str:
         path = Path(outfile)
         if create_parent_dirs:
-            File.resolve_parents(path)
+            FileSystem.resolve_parents(path)
         json_str = json.dumps(
             json_serializable,
             indent=indent,
