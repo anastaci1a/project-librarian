@@ -12,7 +12,7 @@ from .._util.data.base import SerializableCollection
 
 # data
 
-class LibraryConfigData(TypedDict):
+class _LibraryConfigData(TypedDict):
     config_json:      SerializablePath
     cached_json:      SerializablePath
     folder_meta_json: SerializablePath
@@ -27,10 +27,10 @@ def _get_config_args_default():
 
 # library config
 
-class LibraryConfig(SerializableCollection[LibraryConfigData]):
+class LibraryConfig(SerializableCollection[_LibraryConfigData]):
     # const
 
-    _DataTypes = LibraryConfigData
+    _DataTypes = _LibraryConfigData
 
     # factory
 
