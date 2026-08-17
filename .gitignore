@@ -1,7 +1,7 @@
 /.idea/
 /.pytest_cache/
-/test/**/.folder/
-/test/**/.library/
+/out/
+/test/example-library-root/
 **/*.iml
 **/*.temp.*
 **/__pycache__/
