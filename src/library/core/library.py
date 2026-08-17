@@ -14,7 +14,7 @@ from .._util  import FileSystem, JSONFile, SomePath
 
 # folders
 
-class _Folder:
+class Folder:
     # constr
 
     def __init__(self, library: Library, meta: Meta):
@@ -54,8 +54,8 @@ class _Folder:
     def __hash__(self) -> int:
         return hash(self.__key)
 
-    def __eq__(self, other: _Folder) -> bool:
-        if isinstance(other, _Folder):
+    def __eq__(self, other: Folder) -> bool:
+        if isinstance(other, Folder):
             return self.__key == other.__key
         return NotImplemented
 
@@ -89,7 +89,7 @@ class Library:
             folder_skip_if_missing:   bool | None = None,
             folder_create_if_missing: bool        = False
     ):
-        self._folders: list[_Folder] = []
+        self._folders: list[Folder] = []
         self._assign_config_and_paths(
             config,
             Path(library_root)
@@ -174,7 +174,7 @@ class Library:
         return self._paths
 
     @property
-    def folders(self) -> list[_Folder]:
+    def folders(self) -> list[Folder]:
         return self._folders.copy()
 
     # computed props
@@ -282,7 +282,7 @@ class Library:
     # system folder ops
 
     def _folders_add_internal(
-            self, *folders: _Folder,
+            self, *folders: Folder,
             # sys:
             _recache: bool = True
     ) -> None:
@@ -318,7 +318,7 @@ class Library:
                 JSONFile.write(path_meta, meta.serialize())
 
             # init loaded folder
-            folder = _Folder(self, meta)
+            folder = Folder(self, meta)
         else:
             # meta does not exist
             if folder_skip_if_missing: return
@@ -394,7 +394,7 @@ class Library:
         JSONFile.write(path_meta, meta.serialize())
 
         # init/add folder to internal list
-        folder = _Folder(self, meta)
+        folder = Folder(self, meta)
         self._folders_add_internal(
             folder, _recache=_recache
         )
