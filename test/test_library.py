@@ -6,7 +6,11 @@ from library import *
 # tests
 
 def test_library():
-    lib = Library("./test/example-library-root")
+    lib = Library(
+        "./test/example-library-root",
+        do_rescan=True,
+        folder_create_if_missing=True
+    )
     lib.meta_refresh()
 
     # expected:
@@ -18,8 +22,7 @@ def test_library():
             name="My Folder",
             tags={"Label": {"Cool Projects"}}
         ),
-        refresh_meta=True,
-        rename_folder_collisions=True
+        refresh_meta=True
     )
 
     # expected first execution:

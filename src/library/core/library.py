@@ -83,10 +83,11 @@ class Library:
             config: LibraryConfig | None = None,
             *,
             # params:
-            config_create_if_missing:   bool = True,
-            config_allow_overwrite:     bool = False,
-            do_rescan:                  bool = False,
-            skip_if_missing_from_cache: bool = True
+            config_create_if_missing: bool        = True,
+            config_allow_overwrite:   bool        = False,
+            do_rescan:                bool        = False,
+            folder_skip_if_missing:   bool | None = None,
+            folder_create_if_missing: bool        = False
     ):
         self._folders: list[_Folder] = []
         self._assign_config_and_paths(
@@ -101,10 +102,28 @@ class Library:
             config_allow_overwrite   = config_allow_overwrite
         )
 
-        if do_rescan: self.rescan()
-        else: self._rescan_from_cache(
-            skip_if_missing=skip_if_missing_from_cache
-        )
+        if do_rescan:
+            self.rescan(
+                folder_skip_if_missing=(
+                    folder_skip_if_missing
+                    if folder_skip_if_missing is not None
+                    else False
+                ),
+                folder_create_if_missing=folder_create_if_missing
+            )
+        else:
+            if folder_create_if_missing:
+                raise ValueError(
+                    "folder_create_if_missing requires do_rescan=True."
+                )
+
+            self._rescan_from_cache(
+                folder_skip_if_missing=(
+                    folder_skip_if_missing
+                    if folder_skip_if_missing is not None
+                    else True
+                )
+            )
 
     def _init_library(
             self, *,
@@ -182,9 +201,10 @@ class Library:
     def rescan(
             self, *,
             # params:
-            skip_if_missing:   bool = False,
-            create_if_missing: bool = False,
-            _recache:          bool = True
+            folder_skip_if_missing:   bool = False,
+            folder_create_if_missing: bool = False,
+            # sys:
+            _recache: bool = True
     ) -> None:
         self._folders.clear()
 
@@ -196,15 +216,15 @@ class Library:
         self.folders_load(
             *folder_names,
 
-            skip_if_missing=skip_if_missing,
-            create_if_missing=create_if_missing,
+            folder_skip_if_missing=folder_skip_if_missing,
+            folder_create_if_missing=folder_create_if_missing,
             _recache=_recache
         )
 
     def _rescan_from_cache(
             self, *,
             # param(s):
-            skip_if_missing: bool = True
+            folder_skip_if_missing: bool = True
     ) -> None:
         if not self.paths.cached_json.is_file():
             return
@@ -213,8 +233,8 @@ class Library:
         self.folders_load(
             *folder_names,
 
-            skip_if_missing=skip_if_missing,
-            create_if_missing=False,
+            folder_skip_if_missing=folder_skip_if_missing,
+            folder_create_if_missing=False, # don't try to recreate removed/renamed/etc dirs
             _recache=False
         )
 
@@ -226,16 +246,16 @@ class Library:
     def folders_load(
             self, *folder_names: str,
             # params:
-            skip_if_missing:   bool = True,
-            create_if_missing: bool = False,
+            folder_skip_if_missing:   bool = True,
+            folder_create_if_missing: bool = False,
             # sys:
-            _recache:          bool = True
+            _recache: bool = True
     ) -> None:
         for name in folder_names:
             self._folder_load(
                 name,
-                skip_if_missing=skip_if_missing,
-                create_if_missing=create_if_missing,
+                folder_skip_if_missing=folder_skip_if_missing,
+                folder_create_if_missing=folder_create_if_missing,
                 _recache=False # recache once at end
             )
         if _recache: self._recache()
@@ -243,17 +263,17 @@ class Library:
     def folders_create(
             self, *metas: Meta | None,
             # params:
-            rename_folder_collisions: bool = True,
-            allow_overwrite:          bool = True, # does nothing by default until rename_folder_collisions is disabled
+            folder_rename_collisions: bool = True,
+            folder_allow_overwrite:   bool = True, # does nothing by default until folder_rename_collisions is disabled
             refresh_meta:             bool = False,
             # sys:
-            _recache:                 bool = True
+            _recache: bool = True
     ) -> None:
         for meta in metas:
             self._folder_create(
                 meta,
-                rename_folder_collisions=rename_folder_collisions,
-                allow_overwrite=allow_overwrite,
+                folder_rename_collisions=folder_rename_collisions,
+                folder_allow_overwrite=folder_allow_overwrite,
                 refresh_meta=refresh_meta,
                 _recache=False
             )
@@ -276,10 +296,10 @@ class Library:
     def _folder_load(
             self, folder_name: str, *,
             # params:
-            skip_if_missing:   bool,
-            create_if_missing: bool,
+            folder_skip_if_missing:   bool,
+            folder_create_if_missing: bool,
             # sys:
-            _recache:          bool = True
+            _recache: bool = True
     ) -> None:
         # init config
         path_folder = self.paths.root / folder_name
@@ -301,12 +321,12 @@ class Library:
             folder = _Folder(self, meta)
         else:
             # meta does not exist
-            if skip_if_missing: return
-            if not create_if_missing:
+            if folder_skip_if_missing: return
+            if not folder_create_if_missing:
                 raise FileNotFoundError(
                     f"Attempted to load the folder "
                     f"{folder_name!r} which was not found, "
-                    f"but skip_if_missing and create_if_missing were disabled."
+                    f"but folder_skip_if_missing and folder_create_if_missing were disabled."
                 )
 
             # init new folder
@@ -314,8 +334,8 @@ class Library:
                 Meta.create(name=folder_name),
 
                 # since no meta exists, renaming is not necessary, and overwrite/refreshing is ok
-                rename_folder_collisions=False,
-                allow_overwrite=True,
+                folder_rename_collisions=False,
+                folder_allow_overwrite=True,
                 refresh_meta=True,
 
                 _recache=_recache,
@@ -329,11 +349,11 @@ class Library:
     def _folder_create(
             self, meta: Meta | None, *,
             # params:
-            rename_folder_collisions: bool,
-            allow_overwrite:          bool,
+            folder_rename_collisions: bool,
+            folder_allow_overwrite:   bool,
             refresh_meta:             bool,
             # sys:
-            _recache:                 bool = True
+            _recache: bool = True
     ) -> None:
         # init config
         meta_not_provided = meta is None
@@ -342,29 +362,29 @@ class Library:
 
         # handle collisions
         if path_folder.is_dir():
-            if rename_folder_collisions:
+            if folder_rename_collisions:
                 # e.g. "Untitled (3)"
                 name_valid = File.make_valid_subdir_name(self.paths.root, meta.data["name"])
                 meta = Meta.create(
                     **(meta.data | {"name": name_valid})
                 )
                 path_folder = self.paths.root / meta.data["name"] # (redefine)
-            elif not allow_overwrite:
+            elif not folder_allow_overwrite:
                 raise FileExistsError(
                     f"Attempted to create the folder "
                     f"{meta.data["name"]!r} which already exists, "
-                    f"but rename_collisions and allow_overwrite were disabled."
+                    f"but folder_rename_collisions and folder_allow_overwrite were disabled."
                 )
 
         path_meta = path_folder / self.config.folder_meta_json
 
         # verify meta nonexistence
         if path_meta.is_file():
-            if not allow_overwrite:
+            if not folder_allow_overwrite:
                 raise FileExistsError(
                     f"Attempted to create the folder "
                     f"{meta.data["name"]!r} which already exists, "
-                    f"but allow_overwrite was disabled."
+                    f"but folder_allow_overwrite was disabled."
                 )
 
         # create folder/meta
