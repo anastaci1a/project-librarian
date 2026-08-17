@@ -9,7 +9,7 @@ import os
 
 from .config  import LibraryConfig, LibraryPaths
 from .data    import Meta, Tags
-from .._util  import FileSystem, JSONFile, SomePath
+from _util  import FileSystem, JSONFile, SomePath
 
 
 # folders

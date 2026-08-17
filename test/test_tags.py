@@ -1,6 +1,6 @@
 # dep
 
-from library import *
+from library.data import Tags
 
 
 # tests

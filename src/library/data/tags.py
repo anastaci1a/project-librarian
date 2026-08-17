@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from types           import MappingProxyType
 from typing          import Any, Self, TypeGuard, override
 
-from ..._util.data.base import Serializable, JSONValue
+from .._util.data.base import Serializable, JSONValue
 
 
 # types

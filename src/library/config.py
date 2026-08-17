@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from pathlib     import Path
 from typing      import Self, TypedDict, override
 
-from .._util           import SerializablePath, SomePath
-from .._util.data.base import SerializableCollection
+from _util           import SerializablePath, SomePath
+from _util.data.base import SerializableCollection
 
 
 # data

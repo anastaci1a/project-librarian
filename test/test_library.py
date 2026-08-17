@@ -1,6 +1,7 @@
 # dep
 
-from library import *
+from library      import Library
+from library.data import Meta
 
 
 # tests
