@@ -61,10 +61,9 @@ class _Folder:
 
     # meta
 
-    def meta_refresh(self, *, overwrite: bool = True):
+    def meta_refresh(self):
         self._meta = self._meta.get_refreshed(self.path_root)
-        if overwrite:
-            JSONFile.write(self.path_meta, self.meta.serialize())
+        JSONFile.write(self.path_meta, self.meta.serialize())
 
 
 # library

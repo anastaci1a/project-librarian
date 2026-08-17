@@ -37,6 +37,13 @@ def _get_meta_args_default() -> dict[str, Any]:
 # meta
 
 class Meta(SerializableCollection[MetaData]):
+    # data
+    
+    @override
+    @property
+    def data(self) -> MetaData:
+        return self._data.copy()
+    
     # factory
 
     @override
@@ -67,22 +74,19 @@ class Meta(SerializableCollection[MetaData]):
 
     # meta-specific
 
-    def get_refreshed(self, root: Path) -> Meta:
-        date_folder_created    = File.get_creation_date(root)
-        date_folder_modified   = File.get_date_modified(root)
-        date_children_modified = File.get_child_latest_date_modified(root, exclude_dotfiles=True)
-
-        new_date_created = self.data["date_created"] or date_folder_created
-        new_date_modified = (
-                date_children_modified
-                or date_folder_modified
-                or self.data["date_modified"]
-                or self.data["date_created"]
+    def get_refreshed(self, root: Path) -> Self:
+        date_modified = (
+            File.get_child_latest_date_modified(root, exclude_dotfiles=True)
+            or File.get_date_modified(root)
+        )
+        date_created = min(
+            self.data["date_created"].data,
+            date_modified
         )
 
-        return Meta.create(
+        return type(self).create(
             **(self.data | {
-                "date_created":  new_date_created,
-                "date_modified": new_date_modified
+                "date_created":  date_created,
+                "date_modified": date_modified
             })
         )
