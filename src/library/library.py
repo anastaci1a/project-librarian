@@ -9,7 +9,7 @@ import os
 
 from .config  import LibraryConfig, LibraryPaths
 from .data    import Meta, Tags
-from _util  import FileSystem, JSONFile, SomePath
+from ._util   import FileSystem, JSONFile, SomePath
 
 
 # folders
@@ -83,11 +83,9 @@ class Library:
             config: LibraryConfig | None = None,
             *,
             # params:
-            config_create_if_missing: bool        = True,
-            config_allow_overwrite:   bool        = False,
-            do_rescan:                bool        = False,
-            folder_skip_if_missing:   bool | None = None,
-            folder_create_if_missing: bool        = False
+            config_create_if_missing: bool = True,
+            config_allow_overwrite:   bool = False,
+            load_cache:               bool = True
     ):
         self._folders: list[Folder] = []
         self._assign_config_and_paths(
@@ -102,28 +100,8 @@ class Library:
             config_allow_overwrite   = config_allow_overwrite
         )
 
-        if do_rescan:
-            self.rescan(
-                folder_skip_if_missing=(
-                    folder_skip_if_missing
-                    if folder_skip_if_missing is not None
-                    else False
-                ),
-                folder_create_if_missing=folder_create_if_missing
-            )
-        else:
-            if folder_create_if_missing:
-                raise ValueError(
-                    "folder_create_if_missing requires do_rescan=True."
-                )
-
-            self._rescan_from_cache(
-                folder_skip_if_missing=(
-                    folder_skip_if_missing
-                    if folder_skip_if_missing is not None
-                    else True
-                )
-            )
+        if load_cache:
+            self.load_cache()
 
     def _init_library(
             self, *,
@@ -202,7 +180,7 @@ class Library:
             self, *,
             # params:
             folder_skip_if_missing:   bool = False,
-            folder_create_if_missing: bool = False,
+            folder_create_if_missing: bool = True,
             # sys:
             _recache: bool = True
     ) -> None:
@@ -221,7 +199,7 @@ class Library:
             _recache=_recache
         )
 
-    def _rescan_from_cache(
+    def load_cache(
             self, *,
             # param(s):
             folder_skip_if_missing: bool = True
@@ -235,7 +213,7 @@ class Library:
 
             folder_skip_if_missing=folder_skip_if_missing,
             folder_create_if_missing=False, # don't try to recreate removed/renamed/etc dirs
-            _recache=False
+            _recache=True
         )
 
         self._recache(write_cache_json=False)
