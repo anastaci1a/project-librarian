@@ -91,6 +91,7 @@ class Folder:
         # noinspection PyProtectedMember
         self.library._folders_remove_internal(self)
 
+
 # library
 
 class Library:
