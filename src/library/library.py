@@ -157,7 +157,7 @@ class Library:
             if not config_create_if_missing:
                 raise FileNotFoundError(
                     f"Attempted to load the configuration file "
-                    f"{self._paths.config_json!r} which was not found, "
+                    f"{self._paths.config_json!r} which doesn't exist, "
                     f"but config_create_if_missing was disabled."
                 )
 
@@ -325,7 +325,7 @@ class Library:
             if not folder_create_if_missing:
                 raise FileNotFoundError(
                     f"Attempted to load the folder "
-                    f"{folder_name!r} which was not found, "
+                    f"{folder_name!r} which has no metadata, "
                     f"but folder_skip_if_missing and folder_create_if_missing were disabled."
                 )
 
@@ -383,7 +383,7 @@ class Library:
             if not folder_allow_overwrite:
                 raise FileExistsError(
                     f"Attempted to create the folder "
-                    f"{meta.data["name"]!r} which already exists, "
+                    f"{meta.data["name"]!r} which already has metadata, "
                     f"but folder_allow_overwrite was disabled."
                 )
 
