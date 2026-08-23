@@ -6,6 +6,7 @@ from functools import cached_property
 from pathlib   import Path
 
 import os
+import shutil
 
 from .config  import LibraryConfig, LibraryPaths
 from .data    import Meta, Tags
@@ -61,10 +62,34 @@ class Folder:
 
     # meta
 
-    def meta_refresh(self):
+    def meta_reset(self) -> None:
+        self._meta = self._meta.get_reset()
+        self._meta_write()
+
+    def meta_refresh(self) -> None:
         self._meta = self._meta.get_refreshed(self.path_root)
+        self._meta_write()
+
+    def _meta_write(self) -> None:
         JSONFile.write(self.path_meta, self.meta.serialize())
 
+    # data
+
+    def data_delete(self) -> None:
+        path_data = self.path_meta.parent
+        if (
+                path_data == self.path_root
+                or not path_data.is_relative_to(self.path_root)
+        ):
+            raise ValueError(
+                f"Refusing to delete folder data at {path_data!r} because "
+                f"it is not a dedicated directory inside {self.path_root!r}."
+            )
+
+        if path_data.exists():
+            shutil.rmtree(path_data)
+        # noinspection PyProtectedMember
+        self.library._folders_remove_internal(self)
 
 # library
 
@@ -271,6 +296,17 @@ class Library:
         self._folders.extend(folders)
         if _recache: self._recache()
 
+    def _folders_remove_internal(
+            self, *folders: Folder,
+            # sys:
+            _recache: bool = True
+    ) -> None:
+        self._folders = [
+            existing for existing in self._folders
+            if existing not in folders
+        ]
+        if _recache: self._recache()
+
     def _folder_load(
             self, folder_name: str, *,
             # params:
@@ -376,7 +412,6 @@ class Library:
         self._folders_add_internal(
             folder, _recache=_recache
         )
-
 
     # util
 
