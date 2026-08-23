@@ -283,6 +283,10 @@ class Library:
             )
         if _recache: self._recache()
 
+    def folders_purge(self) -> None:
+        for folder in self.folders:
+            folder.data_delete()
+
     # system folder ops
 
     def _folders_add_internal(
