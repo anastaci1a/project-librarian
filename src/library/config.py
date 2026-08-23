@@ -6,8 +6,9 @@ from dataclasses import dataclass
 from pathlib     import Path
 from typing      import Self, TypedDict, override
 
-from _util           import SerializablePath, SomePath
-from _util.data.base import SerializableCollection
+from ._util           import SomePath
+from ._util.data      import SerializablePath
+from ._util.data.base import SerializableCollection
 
 
 # data
@@ -31,6 +32,13 @@ class LibraryConfig(SerializableCollection[_LibraryConfigData]):
     # const
 
     _DataTypes = _LibraryConfigData
+
+    # data
+
+    @override
+    @property
+    def data(self) -> _LibraryConfigData:
+        return None
 
     # factory
 
@@ -58,15 +66,15 @@ class LibraryConfig(SerializableCollection[_LibraryConfigData]):
 
     @property
     def config_json(self) -> Path:
-        return self.data["config_json"].data
+        return self._data["config_json"].data
 
     @property
     def cached_json(self) -> Path:
-        return self.data["cached_json"].data
+        return self._data["cached_json"].data
 
     @property
     def folder_meta_json(self) -> Path:
-        return self.data["folder_meta_json"].data
+        return self._data["folder_meta_json"].data
 
     # sys
 

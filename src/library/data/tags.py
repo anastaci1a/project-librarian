@@ -10,8 +10,8 @@ from .._util.data.base import Serializable, JSONValue
 # types
 
 type TagsData       = Mapping[str, frozenset[str]]
-type TagValuesInput = list[str] | tuple[str, ...] | set[str] | frozenset[str]
 type TagsInput      = Mapping[str, TagValuesInput]
+type TagValuesInput = list[str] | tuple[str, ...] | set[str] | frozenset[str]
 
 def is_tagsinput(value: Any) -> TypeGuard[TagsInput]:
     return (
@@ -28,6 +28,11 @@ def is_tagsinput(value: Any) -> TypeGuard[TagsInput]:
 # tags
 
 class Tags(Serializable[TagsData]):
+    @override
+    @property
+    def data(self) -> TagsData:
+        return self._data
+
     @override
     @classmethod
     def _parse(

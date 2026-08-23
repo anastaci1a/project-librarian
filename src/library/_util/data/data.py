@@ -11,7 +11,10 @@ from .base import JSONValue, Serializable
 # individual pieces of data
 
 class SerializableDateTime(Serializable[datetime]):
-    # method
+    @override
+    @property
+    def data(self) -> datetime:
+        return self._data
 
     @override
     @classmethod
@@ -25,7 +28,10 @@ class SerializableDateTime(Serializable[datetime]):
         return self._data.isoformat()
 
 class SerializablePath(Serializable[Path]):
-    # method
+    @override
+    @property
+    def data(self) -> Path:
+        return self._data
 
     @override
     @classmethod

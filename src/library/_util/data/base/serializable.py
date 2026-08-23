@@ -100,8 +100,9 @@ class Serializable[T](ABC):
     # prop
 
     @property
+    @abstractmethod
     def data(self) -> T:
-        return self._data # unsafe by default
+        return NotImplementedError
 
     # parsing
 
@@ -114,7 +115,7 @@ class Serializable[T](ABC):
             **kwargs: Any
     ) -> T:
         if allow_instances_of_cls and isinstance(unparsed, cls):
-            return unparsed.data
+            return unparsed._data
 
         elif allow_instances_of_T:
             stored_type = cls._DataType
@@ -208,7 +209,7 @@ class SerializableCollection[TD: TypedDict](Serializable[TD], ABC):
     @classmethod
     def _parse(cls, unparsed: dict[str, Any], /, **kwargs: Any) -> TD:
         if isinstance(unparsed, cls):
-            return unparsed.data
+            return unparsed._data
 
         if not isinstance(unparsed, dict):
             raise TypeError(
@@ -288,7 +289,7 @@ class SerializableCollection[TD: TypedDict](Serializable[TD], ABC):
         data_serialized: dict[str, JSONValue] = {}
 
         for k, expected_type in hints.items():
-            if k not in self.data.keys():
+            if k not in self._data.keys():
                 continue
 
             raw_value = self._data[k]
