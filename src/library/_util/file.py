@@ -23,12 +23,12 @@ class FileSystem:
     @classmethod
     def make_valid_subdir_name(
             cls,
-            parent_dir:       SomePath,
+            root:             SomePath,
             proposed_name:    str,
             numbering_scheme: str = "%s (%d)"
     ):
         test_name, i = proposed_name, 2
-        while (Path(parent_dir) / Path(test_name)).is_dir():
+        while (Path(root) / Path(test_name)).is_dir():
             test_name = numbering_scheme % (proposed_name, i)
             i += 1
         return test_name
@@ -38,7 +38,7 @@ class FileSystem:
         Path(file).parent.mkdir(parents=True, exist_ok=True)
 
     @classmethod
-    def get_creation_date(cls, file: SomePath) -> datetime:
+    def get_date_created(cls, file: SomePath) -> datetime:
         stat, ts = Path(file).stat(), None
         if sys.platform == "win32":
             ts = stat.st_ctime
@@ -55,20 +55,67 @@ class FileSystem:
             Path(file).stat().st_mtime
         )
 
-    @classmethod
-    def get_child_latest_date_modified(
-            cls,
-            folder: SomePath,
-            exclude_dotfiles: bool = True
-    ) -> datetime|None:
-        scanned = list(os.scandir(folder))
-        if exclude_dotfiles:
-            scanned = [p for p in scanned if not p.name.startswith(".")]
-        ts_latest = max([p.stat().st_mtime for p in scanned], default=None)
+    @staticmethod
+    def get_earliest_date_modified(paths: list[Path]) -> datetime|None:
+        ts_earliest = min(
+            (path.stat().st_mtime for path in paths),
+            default=None
+        )
+        if ts_earliest is None:
+            return None
+        return datetime.fromtimestamp(ts_earliest)
+
+    @staticmethod
+    def get_latest_date_modified(paths: list[Path]) -> datetime|None:
+        ts_latest = max(
+            (path.stat().st_mtime for path in paths),
+            default=None
+        )
         if ts_latest is None:
             return None
         return datetime.fromtimestamp(ts_latest)
 
+    @classmethod
+    def get_children(
+            cls,
+            root: SomePath,
+            *,
+            sublevels:        int  = 1,
+            include_root:     bool = True,
+            exclude_dotfiles: bool = False,
+            exclude_folders:  bool = False
+    ) -> list[Path]:
+        if sublevels < 0:
+            raise ValueError("sublevels must be greater than or equal to 0")
+
+        root = Path(root)
+        scanned: list[Path] = []
+
+        if sublevels > 0:
+            children = [
+                path for path in root.iterdir()
+                if not exclude_dotfiles or not path.name.startswith(".")
+            ]
+            subdirs = [path for path in children if path.is_dir()]
+
+            scanned.extend(
+                path for path in children
+                if not exclude_folders or not path.is_dir()
+            )
+
+            if sublevels > 1:
+                for subdir in subdirs:
+                    scanned.extend(cls.get_children(
+                        subdir,
+                        sublevels=sublevels - 1,
+                        include_root=False,
+                        exclude_dotfiles=exclude_dotfiles,
+                        exclude_folders=exclude_folders
+                    ))
+
+        if include_root:
+            scanned.append(root)
+        return scanned
 
 # json-specific utils
 

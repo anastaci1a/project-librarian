@@ -74,14 +74,28 @@ class Meta(SerializableCollection[MetaData]):
 
     # meta-specific
 
-    def get_refreshed(self, root: Path) -> Self:
-        date_modified = (
-                FileSystem.get_child_latest_date_modified(root, exclude_dotfiles=True)
-                or FileSystem.get_date_modified(root)
+    def get_reset(self) -> Self:
+        return self.create(
+            name=self.data["name"]
         )
+
+    def get_refreshed(self, root: Path) -> Self:
+        children = FileSystem.get_children(
+            root,
+            include_root=False,
+            exclude_dotfiles=True,
+            exclude_folders=True
+        )
+
+        date_modified = (
+            FileSystem.get_latest_date_modified(children)
+            or FileSystem.get_date_modified(root)
+        )
+
         date_created = min(
+            date_modified,
+            FileSystem.get_earliest_date_modified(children) or date_modified,
             self.data["date_created"].data,
-            date_modified
         )
 
         return type(self).create(
