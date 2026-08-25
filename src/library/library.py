@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from functools import cached_property
+from functools import cached_property, wraps
 from pathlib   import Path
 
 import os
@@ -11,6 +11,17 @@ import shutil
 from .config  import LibraryConfig, LibraryPaths
 from .data    import Meta, Tags
 from ._util   import FileSystem, JSONFile, SomePath
+
+
+# state helper
+
+def requires_active(method):
+    @wraps(method)
+    def guarded(self, *args, **kwargs):
+        self._require_active()
+        return method(self, *args, **kwargs)
+
+    return guarded
 
 
 # folders
@@ -60,12 +71,22 @@ class Folder:
             return self.__key == other.__key
         return NotImplemented
 
+    def _require_active(self) -> None:
+        # noinspection PyProtectedMember
+        self.library._require_active()
+        if self not in self.library.folders:
+            raise RuntimeError(
+                "This Folder instance is no longer active."
+            )
+
     # meta
 
+    @requires_active
     def meta_reset(self) -> None:
         self._meta = self._meta.get_reset()
         self._meta_write()
 
+    @requires_active
     def meta_refresh(self) -> None:
         self._meta = self._meta.get_refreshed(self.path_root)
         self._meta_write()
@@ -75,6 +96,7 @@ class Folder:
 
     # data
 
+    @requires_active
     def data_delete(self) -> None:
         path_data = self.path_meta.parent
         if (
@@ -113,6 +135,7 @@ class Library:
             config_allow_overwrite:   bool = False,
             load_cache:               bool = True
     ):
+        self._is_active = False
         self._folders: list[Folder] = []
         self._assign_config_and_paths(
             config,
@@ -125,6 +148,7 @@ class Library:
             config_create_if_missing = config_create_if_missing,
             config_allow_overwrite   = config_allow_overwrite
         )
+        self._is_active = True
 
         if load_cache:
             self.load_cache()
@@ -195,13 +219,27 @@ class Library:
             f.meta.data["tags"] for f in self._folders
         ])
 
+    # state
+
+    @property
+    def is_active(self) -> bool:
+        return self._is_active
+
+    def _require_active(self) -> None:
+        if not self.is_active:
+            raise RuntimeError(
+                "This Library instance is no longer active."
+            )
+
     # scanning
 
+    @requires_active
     def meta_refresh(self) -> None:
         for f in self._folders:
             f.meta_refresh()
         self._recache(write_cache_json=False) # tags are not in */cache.json
 
+    @requires_active
     def rescan(
             self, *,
             # params:
@@ -225,6 +263,7 @@ class Library:
             _recache=_recache
         )
 
+    @requires_active
     def load_cache(
             self, *,
             # param(s):
@@ -245,8 +284,30 @@ class Library:
         self._recache(write_cache_json=False)
         # (cached list unchanged except for missing folders, to (mostly) no effect)
 
-    # user-facing folder ops
+    # destructive ops
 
+    @requires_active
+    def purge_all(self) -> None:
+        path_data = self.paths.config_json.parent
+        if (
+                path_data == self.paths.root
+                or not path_data.is_relative_to(self.paths.root)
+        ):
+            raise ValueError(
+                f"Refusing to purge library data at {path_data!r} because "
+                f"it is not a dedicated directory inside {self.paths.root!r}."
+            )
+
+        try:
+            self.folders_purge()
+            if path_data.exists():
+                shutil.rmtree(path_data)
+        finally:
+            self._is_active = False
+
+    # folder ops
+
+    @requires_active
     def folders_load(
             self, *folder_names: str,
             # params:
@@ -264,6 +325,7 @@ class Library:
             )
         if _recache: self._recache()
 
+    @requires_active
     def folders_create(
             self, *metas: Meta | None,
             # params:
@@ -283,6 +345,7 @@ class Library:
             )
         if _recache: self._recache()
 
+    @requires_active
     def folders_purge(self) -> None:
         for folder in self.folders:
             folder.data_delete()
