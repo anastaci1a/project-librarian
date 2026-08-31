@@ -8,9 +8,9 @@ from pathlib   import Path
 import os
 import shutil
 
-from .config  import LibraryConfig, LibraryPaths
-from .data    import Meta, Tags
-from ._util   import FileSystem, JSONFile, SomePath
+from .config import LibraryConfig, LibraryPaths
+from .data   import Meta, Tags
+from ._util  import FileSystem, Generator, JSONFile, SomePath
 
 
 # state helper
@@ -46,6 +46,10 @@ class Folder:
         return self._meta
 
     @property
+    def uid(self):
+        return self.meta.data["uid"]
+
+    @property
     def name(self):
         return self.meta.data["name"]
 
@@ -74,7 +78,7 @@ class Folder:
     def _require_active(self) -> None:
         # noinspection PyProtectedMember
         self.library._require_active()
-        if self not in self.library.folders:
+        if self.uid not in self.library._folders.keys():
             raise RuntimeError(
                 "This Folder instance is no longer active."
             )
@@ -136,11 +140,11 @@ class Library:
             load_cache:               bool = True
     ):
         self._is_active = False
-        self._folders: list[Folder] = []
         self._assign_config_and_paths(
             config,
             Path(library_root)
         )
+        self._folders: dict[str, Folder] = {}
 
         config_was_provided = config is not None
         self._init_library(
@@ -202,7 +206,7 @@ class Library:
         return self._paths
 
     @property
-    def folders(self) -> list[Folder]:
+    def folders(self) -> dict[str, Folder]:
         return self._folders.copy()
 
     # computed props
@@ -210,13 +214,13 @@ class Library:
     @cached_property
     def folder_relpaths(self) -> list[Path]:
         return sorted([
-            Path(f"./{f.name}") for f in self._folders
+            Path(f"./{f.name}") for f in self._folders.values()
         ])
 
     @cached_property
     def tags(self) -> Tags:
         return Tags.combine(*[
-            f.meta.data["tags"] for f in self._folders
+            f.meta.data["tags"] for f in self._folders.values()
         ])
 
     # state
@@ -235,7 +239,7 @@ class Library:
 
     @requires_active
     def meta_refresh(self) -> None:
-        for f in self._folders:
+        for f in self._folders.values():
             f.meta_refresh()
         self._recache(write_cache_json=False) # tags are not in */cache.json
 
@@ -347,7 +351,7 @@ class Library:
 
     @requires_active
     def folders_purge(self) -> None:
-        for folder in self.folders:
+        for folder in set(self._folders.values()):
             folder.data_delete()
 
     # system folder ops
@@ -357,11 +361,10 @@ class Library:
             # sys:
             _recache: bool = True
     ) -> None:
-        self._folders = [
-            existing for existing in self._folders
-            if existing not in folders
-        ]
-        self._folders.extend(folders)
+        self._folders.update({
+            f.meta.data["uid"]: f for f in folders
+            if f not in self._folders
+        })
         if _recache: self._recache()
 
     def _folders_remove_internal(
@@ -369,10 +372,10 @@ class Library:
             # sys:
             _recache: bool = True
     ) -> None:
-        self._folders = [
-            existing for existing in self._folders
-            if existing not in folders
-        ]
+        for f in folders:
+            self._folders.pop(
+                f.meta.data["uid"]
+            )
         if _recache: self._recache()
 
     def _folder_load(
@@ -413,7 +416,7 @@ class Library:
 
             # init new folder
             self._folder_create(
-                Meta.create(name=folder_name),
+                Meta.create(name=folder_name, uid_generator=self._uid_generate),
 
                 # since no meta exists, renaming is not necessary, and overwrite/refreshing is ok
                 folder_rename_collisions=False,
@@ -439,7 +442,7 @@ class Library:
     ) -> None:
         # init config
         meta_not_provided = meta is None
-        meta = meta or Meta.create()
+        meta = meta or Meta.create(uid_generator=self._uid_generate)
         path_folder = self.paths.root / meta.data["name"]
 
         # handle collisions
@@ -473,7 +476,7 @@ class Library:
         FileSystem.resolve_parents(path_meta)
         if refresh_meta or meta_not_provided:
             meta = meta.get_refreshed(path_folder)
-        JSONFile.write(path_meta, meta.serialize())
+        meta.write(path_meta)
 
         # init/add folder to internal list
         folder = Folder(self, meta)
@@ -482,6 +485,12 @@ class Library:
         )
 
     # util
+
+    def _uid_generate(self):
+        return Generator.uid_generate(
+            self.config.folder_uid_len,
+            exclude=self._folders.keys()
+        )
 
     def _write_config(self):
         JSONFile.write(
