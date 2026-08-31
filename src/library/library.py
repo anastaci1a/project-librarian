@@ -140,11 +140,9 @@ class Library:
             load_cache:               bool = True
     ):
         self._is_active = False
-        self._assign_config_and_paths(
-            config,
-            Path(library_root)
-        )
         self._folders: dict[str, Folder] = {}
+        self._config = config or LibraryConfig.create()
+        self._paths = self._config.resolve(library_root)
 
         config_was_provided = config is not None
         self._init_library(
@@ -171,7 +169,8 @@ class Library:
             if not config_was_provided or config_found == self._config:
                 # use existing config
                 write_new_config = False
-                self._assign_config_and_paths(config_found, self._paths.root)
+                self._config = config_found
+                self._paths = self._config.resolve(self._paths.root)
             elif config_allow_overwrite:
                 # delete old config and overwrite
                 write_new_config = True
@@ -548,11 +547,3 @@ class Library:
             self.__dict__.pop(d, None)
         if write_cache_json:
             self._write_cache()
-
-    def _assign_config_and_paths(
-            self,
-            config: LibraryConfig | None,
-            library_root: Path
-    ):
-        self._config = config or LibraryConfig.create()
-        self._paths = self._config.resolve(library_root)
