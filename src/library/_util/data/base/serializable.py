@@ -133,7 +133,7 @@ class Serializable[T](ABC):
         raise NotImplementedError
 
     @classmethod
-    def from_serialized(
+    def deserialize(
             cls, serialized: JSONValue, /,
             **kwargs: Any
     ) -> Self:
@@ -158,7 +158,7 @@ class Serializable[T](ABC):
     @classmethod
     def read(cls, infile: SomePath, /, **kwargs: Any) -> Self:
         serialized = JSONFile.read(infile)
-        return cls.from_serialized(serialized, **kwargs)
+        return cls.deserialize(serialized, **kwargs)
 
 
 # collections

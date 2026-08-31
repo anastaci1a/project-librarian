@@ -166,7 +166,7 @@ class Library:
     ) -> None:
         try:
             config_found_dict = JSONFile.read(self._paths.config_json)
-            config_found = LibraryConfig.from_serialized(config_found_dict)
+            config_found = LibraryConfig.deserialize(config_found_dict)
 
             if not config_was_provided or config_found == self._config:
                 # use existing config
@@ -247,8 +247,11 @@ class Library:
     def rescan(
             self, *,
             # params:
-            folder_skip_if_missing:   bool = False,
-            folder_create_if_missing: bool = True,
+            folder_skip_if_incompatible:   bool = False,
+            folder_skip_if_missing:        bool = False,
+            folder_create_if_missing:      bool = True,
+            folder_fill_missing_fields:    bool = True,
+            folder_discard_unknown_fields: bool = True,
             # sys:
             _recache: bool = True
     ) -> None:
@@ -262,8 +265,11 @@ class Library:
         self.folders_load(
             *folder_names,
 
+            folder_skip_if_incompatible=folder_skip_if_incompatible,
             folder_skip_if_missing=folder_skip_if_missing,
             folder_create_if_missing=folder_create_if_missing,
+            folder_fill_missing_fields=folder_fill_missing_fields,
+            folder_discard_unknown_fields=folder_discard_unknown_fields,
             _recache=_recache
         )
 
@@ -315,19 +321,32 @@ class Library:
     def folders_load(
             self, *folder_names: str,
             # params:
-            folder_skip_if_missing:   bool = True,
-            folder_create_if_missing: bool = False,
+            folder_skip_if_incompatible:   bool = False,
+            folder_skip_if_missing:        bool = False,
+            folder_create_if_missing:      bool = True,
+            folder_fill_missing_fields:    bool = False,
+            folder_discard_unknown_fields: bool = False,
             # sys:
             _recache: bool = True
-    ) -> None:
-        for name in folder_names:
-            self._folder_load(
-                name,
-                folder_skip_if_missing=folder_skip_if_missing,
-                folder_create_if_missing=folder_create_if_missing,
-                _recache=False # recache once at end
-            )
-        if _recache: self._recache()
+    ) -> set[Folder]:
+        succeeded: list[Folder] = []
+        try:
+            for name in set(folder_names):
+                folder = self._folder_load(
+                    name,
+                    folder_skip_if_incompatible=folder_skip_if_incompatible,
+                    folder_skip_if_missing=folder_skip_if_missing,
+                    folder_create_if_missing=folder_create_if_missing,
+                    folder_fill_missing_fields=folder_fill_missing_fields,
+                    folder_discard_unknown_fields=folder_discard_unknown_fields,
+                    _recache=False # recache once at end
+                )
+                if folder is not None:
+                    succeeded.append(folder)
+        finally:
+            if _recache: self._recache()
+
+        return set(succeeded)
 
     @requires_active
     def folders_create(
@@ -381,11 +400,14 @@ class Library:
     def _folder_load(
             self, folder_name: str, *,
             # params:
-            folder_skip_if_missing:   bool,
-            folder_create_if_missing: bool,
+            folder_skip_if_incompatible:   bool,
+            folder_skip_if_missing:        bool,
+            folder_create_if_missing:      bool,
+            folder_fill_missing_fields:    bool,
+            folder_discard_unknown_fields: bool,
             # sys:
             _recache: bool = True
-    ) -> None:
+    ) -> Folder | None:
         # init config
         path_folder = self.paths.root / folder_name
         path_meta   = path_folder / self.config.folder_meta_json
@@ -393,20 +415,35 @@ class Library:
         if path_meta.is_file():
             # meta exists
             meta_raw = JSONFile.read(path_meta)
-            meta = Meta.from_serialized(meta_raw)
+            try:
+                meta = Meta.deserialize(
+                    meta_raw,
+                    discard_unknown_fields=folder_discard_unknown_fields,
+                    repair_with_defaults=folder_fill_missing_fields,
+                    uid_generator=self._uid_generate
+                )
+            except TypeError:
+                if folder_skip_if_incompatible:
+                    return None
+                raise
+            meta_changed = folder_fill_missing_fields
 
-            # fix potential folder name mismatch
+            # fix potential folder/meta name mismatch
             if meta.data["name"] != folder_name:
                 meta = Meta.create(
                     **(meta.data | {"name": folder_name})
                 )
-                JSONFile.write(path_meta, meta.serialize())
+                meta_changed = True
+
+            # overwrite meta if changed internally
+            if meta_changed:
+                meta.write(path_meta)
 
             # init loaded folder
             folder = Folder(self, meta)
         else:
             # meta does not exist
-            if folder_skip_if_missing: return
+            if folder_skip_if_missing: return None
             if not folder_create_if_missing:
                 raise FileNotFoundError(
                     f"Attempted to load the folder "
@@ -415,7 +452,7 @@ class Library:
                 )
 
             # init new folder
-            self._folder_create(
+            return self._folder_create(
                 Meta.create(name=folder_name, uid_generator=self._uid_generate),
 
                 # since no meta exists, renaming is not necessary, and overwrite/refreshing is ok
@@ -424,12 +461,13 @@ class Library:
                 refresh_meta=True,
 
                 _recache=_recache,
-            ); return
+            )
 
         # add folder to internal list
         self._folders_add_internal(
             folder, _recache=_recache
         )
+        return folder
 
     def _folder_create(
             self, meta: Meta | None, *,
@@ -439,7 +477,7 @@ class Library:
             refresh_meta:             bool,
             # sys:
             _recache: bool = True
-    ) -> None:
+    ) -> Folder:
         # init config
         meta_not_provided = meta is None
         meta = meta or Meta.create(uid_generator=self._uid_generate)
@@ -483,6 +521,7 @@ class Library:
         self._folders_add_internal(
             folder, _recache=_recache
         )
+        return folder
 
     # util
 

@@ -79,6 +79,29 @@ class Meta(SerializableCollection[MetaData]):
             args_defaults=_get_meta_args_default(uid_generator)
         )
 
+    # conversions
+
+    @override
+    @classmethod
+    def deserialize(
+            cls,
+            serialized: JSONValue,
+            *,
+            discard_unknown_fields: bool = True,
+            repair_with_defaults:   bool = False,
+            uid_generator: Callable[[], str] = Generator.uid_generate
+    ) -> Self:
+        if not repair_with_defaults:
+            return super().deserialize(
+                serialized,
+                discard_unknown_fields=discard_unknown_fields # passed to SerializableCollection._validate_serialized
+            )
+        serialized = cls._validate_serialized(
+            serialized,
+            discard_unknown_fields=discard_unknown_fields
+        )
+        return cls.create(**serialized, uid_generator=uid_generator)
+
     # meta-specific
 
     def get_reset(self) -> Self:
