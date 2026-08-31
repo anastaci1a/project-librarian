@@ -23,7 +23,7 @@ def test_meta():
     print("3:", meta_dict_fromfile)
     # expected: {"name": "Untitled", ..., "tags": dict[str, list[str]], ...}
 
-    meta_fromfile = meta.from_serialized(meta_dict_fromfile)
+    meta_fromfile = meta.deserialize(meta_dict_fromfile)
     print("4:", meta_fromfile)
     # expected: Meta(name="Untitled", ..., tags: Mapping[str, frozenset[str]], ...)
 

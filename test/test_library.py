@@ -6,17 +6,31 @@ from library.data import Meta
 
 # tests
 
-def test_library():
-    lib = Library(
-        "./test/example-library-root",
-        do_rescan=True,
-        folder_create_if_missing=True
-    )
-    lib.meta_refresh()
+def test_library_loads():
+    lib = Library("./test/example-library-root", load_cache=False)
 
-    # expected:
-    # - generate [root]/.library/config.json
-    # - (nothing else)
+    print("loading from cache...")
+    try:
+        lib.load_cache()
+    except TypeError as e:
+        print(f"(err: {e})")
+    cached = len(lib.folders)
+    print(f"loaded {cached} cached folders.\n")
+
+    assert lib.paths.root.is_dir()
+    assert lib.paths.config_json.is_file()
+
+    input("press enter to rescan...")
+    lib.rescan()
+    print(f"found {len(lib.folders) - cached} new folders.\n")
+
+    input("press enter to purge...")
+    lib.purge_all()
+    print("done.")
+    exit()
+
+def test_library_meta():
+    lib = Library("./test/example-library-root")
 
     lib.folders_create(
         Meta.create(
@@ -28,7 +42,6 @@ def test_library():
 
     # expected first execution:
     # - generate [root]/My Folder/.folder/meta.json
-    #   - (has name, tags, date_created, date_modified)
     # - generate [root]/.library/cached.json
 
     # expected progressive executions:
@@ -43,4 +56,5 @@ def test_library():
 # main
 
 if __name__ == "__main__":
-    test_library()
+    test_library_loads()
+    # test_library_meta()
