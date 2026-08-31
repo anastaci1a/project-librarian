@@ -4,17 +4,18 @@ from __future__  import annotations
 
 from datetime import datetime
 from pathlib  import Path
-from typing   import Any, NotRequired, Self, TypedDict, override
+from typing   import Any, Callable, NotRequired, Self, TypedDict, override
 
 from .tags import TagsInput, Tags
 
-from .._util           import FileSystem, SerializableDateTime, SerializablePath
-from .._util.data.base import SerializableCollection
+from .._util           import FileSystem, Generator, SerializableDateTime, SerializablePath
+from .._util.data.base import SerializableCollection, JSONValue
 
 
 # data
 
 class MetaData(TypedDict):
+    uid:           str
     name:          str
     tags:          Tags
     date_created:  SerializableDateTime
@@ -23,10 +24,13 @@ class MetaData(TypedDict):
     description:   NotRequired[str]
     path_icon:     NotRequired[SerializablePath]
 
-def _get_meta_args_default() -> dict[str, Any]:
+def _get_meta_args_default(
+        uid_generator: Callable[[], str]
+) -> dict[str, Any]:
     now = datetime.now()
 
     return {
+        "uid":  uid_generator(),
         "name": "Untitled",
         "tags": {},
         "date_created": now,
@@ -51,14 +55,17 @@ class Meta(SerializableCollection[MetaData]):
     def create(
             cls,
             *,
+            uid:           str            | None = None,
             name:          str            | None = None,
             description:   str            | None = None,
             tags:          TagsInput      | None = None,
             date_created:  str | datetime | None = None,
             date_modified: str | datetime | None = None,
-            path_icon:     str | Path     | None = None
+            path_icon:     str | Path     | None = None,
+            uid_generator: Callable[[], str] = Generator.uid_generate
     ) -> Self:
         kwargs = {
+            "uid":           uid,
             "name":          name,
             "description":   description,
             "tags":          tags,
@@ -69,7 +76,7 @@ class Meta(SerializableCollection[MetaData]):
 
         return super().create(
             **kwargs,
-            args_defaults=_get_meta_args_default()
+            args_defaults=_get_meta_args_default(uid_generator)
         )
 
     # meta-specific
