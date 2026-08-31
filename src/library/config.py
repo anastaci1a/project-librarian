@@ -17,12 +17,14 @@ class _LibraryConfigData(TypedDict):
     config_json:      SerializablePath
     cached_json:      SerializablePath
     folder_meta_json: SerializablePath
+    folder_uid_len:   int
 
 def _get_config_args_default():
     return {
         "config_json":      ".library/config.json",
         "cached_json":      ".library/cached.json",
-        "folder_meta_json": ".folder/meta.json"
+        "folder_meta_json": ".folder/meta.json",
+        "folder_uid_len":   16
     }
 
 
@@ -49,12 +51,14 @@ class LibraryConfig(SerializableCollection[_LibraryConfigData]):
             *,
             config_json:      SomePath | None = None,
             cached_json:      SomePath | None = None,
-            folder_meta_json: SomePath | None = None
+            folder_meta_json: SomePath | None = None,
+            folder_uid_len:   int      | None = None,
     ) -> Self:
         kwargs = {
             "config_json":      config_json,
             "cached_json":      cached_json,
-            "folder_meta_json": folder_meta_json
+            "folder_meta_json": folder_meta_json,
+            "folder_uid_len":   folder_uid_len
         }
 
         return super().create(
@@ -75,6 +79,10 @@ class LibraryConfig(SerializableCollection[_LibraryConfigData]):
     @property
     def folder_meta_json(self) -> Path:
         return self._data["folder_meta_json"].data
+
+    @property
+    def folder_uid_len(self) -> int:
+        return self._data["folder_uid_len"]
 
     # sys
 
