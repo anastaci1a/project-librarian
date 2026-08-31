@@ -82,6 +82,7 @@ class Meta(SerializableCollection[MetaData]):
     def get_refreshed(self, root: Path) -> Self:
         children = FileSystem.get_children(
             root,
+            sublevels=5,
             include_root=False,
             exclude_dotfiles=True,
             exclude_folders=True

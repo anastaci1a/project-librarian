@@ -138,9 +138,16 @@ class Serializable[T](ABC):
             **kwargs: Any
     ) -> Self:
         return cls(
-            serialized,
+            cls._validate_serialized(serialized, **kwargs),
             **kwargs
         )
+
+    @classmethod
+    def _validate_serialized(
+            cls, serialized: JSONValue, /,
+            **kwargs: Any
+    ) -> JSONValue:
+        return serialized
 
     # file
 
@@ -308,3 +315,31 @@ class SerializableCollection[TD: TypedDict](Serializable[TD], ABC):
                 )
 
         return data_serialized
+
+    @override
+    @classmethod
+    def _validate_serialized(
+            cls, serialized: JSONValue,
+            *,
+            discard_unknown_fields: bool = True,
+            **kwargs: Any
+    ) -> dict[str, JSONValue]:
+        if not isinstance(serialized, dict):
+            raise TypeError(
+                f"Expected serialized {cls.__name__} to be a dict, "
+                f"got {type(serialized).__name__}"
+            )
+
+        expected_keys = get_type_hints(cls._DataType)
+        unknown_keys = serialized.keys() - expected_keys.keys()
+
+        if unknown_keys and not discard_unknown_fields:
+            raise TypeError(
+                f"Unknown field(s) for {cls.__name__}: "
+                f"{sorted(unknown_keys)}"
+            )
+
+        return {
+            k: v for k, v in serialized.items()
+            if k in expected_keys
+        }
