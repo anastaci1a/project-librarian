@@ -4,12 +4,17 @@ from library      import Library
 from library.data import Meta
 
 
+# const
+
+LIBRARY_ROOT = "./test/example-library-root"
+
+
 # tests
 
-def test_library_loads():
-    lib = Library("./test/example-library-root", load_cache=False)
-
-    print("loading from cache...")
+def test_library_init() -> Library:
+    input(f"press enter to load library at \"{LIBRARY_ROOT}\"...")
+    lib = Library(LIBRARY_ROOT, load_cache=False)
+    print("initialized.")
     try:
         lib.load_cache()
     except TypeError as e:
@@ -20,41 +25,41 @@ def test_library_loads():
     assert lib.paths.root.is_dir()
     assert lib.paths.config_json.is_file()
 
+    return lib
+
+def test_library_rescan(lib: Library):
     input("press enter to rescan...")
-    lib.rescan()
-    print(f"found {len(lib.folders) - cached} new folders.\n")
+    start_amt = len(lib.folders); lib.rescan()
+    print(f"found and loaded {len(lib.folders) - start_amt} new folders.\n")
 
-    input("press enter to purge...")
-    lib.purge_all()
-    print("done.")
-    exit()
-
-def test_library_meta():
-    lib = Library("./test/example-library-root")
-
-    lib.folders_create(
+def test_library_modif(lib: Library):
+    folder_name = input(f"enter a folder to create... (enter to skip)\n> ")
+    if folder_name == "": print("(skipped.)\n"); return
+    new_folders = lib.folders_create(
         Meta.create(
-            name="My Folder",
+            name=folder_name,
             tags={"Label": {"Cool Projects"}}
         ),
         refresh_meta=True
     )
+    print(f"done. (library now contains {len(lib.folders)} folders.)\n")
 
-    # expected first execution:
-    # - generate [root]/My Folder/.folder/meta.json
-    # - generate [root]/.library/cached.json
+    for f in new_folders:
+        assert f.path_root.is_dir()
+        assert f.path_meta.is_file()
 
-    # expected progressive executions:
-    # - generate [root]/My Folder (1)/.folder/, /My Folder (2)/, /My Folder (3)/, ...
-
-    print(len(lib.folders))
-
-    # expected first execution:        1         (/Untitled/)
-    # expected progressive executions: 2, 3, ... (/Untitled (2)/, /Untitled (3)/, ...)
+def test_library_purge(lib: Library):
+    user_input = input("press enter to purge... (type anything to skip)")
+    if user_input != "": print("(skipped.)\n"); return
+    lib.purge_all()
+    print("done.\n")
 
 
 # main
 
 if __name__ == "__main__":
-    test_library_loads()
-    # test_library_meta()
+    print()
+    lib = test_library_init()
+    test_library_rescan(lib)
+    test_library_modif(lib)
+    test_library_purge(lib)
