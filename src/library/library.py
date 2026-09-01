@@ -1,121 +1,16 @@
-# dep
-
 from __future__ import annotations
-
-from functools import cached_property, wraps
-from pathlib   import Path
 
 import os
 import shutil
 
-from .config import LibraryConfig, LibraryPaths
-from .data   import Meta, Tags
-from ._util  import FileSystem, Generator, JSONFile, SomePath
+from functools import cached_property
+from pathlib   import Path
 
-
-# state helper
-
-def requires_active(method):
-    @wraps(method)
-    def guarded(self, *args, **kwargs):
-        self._require_active()
-        return method(self, *args, **kwargs)
-
-    return guarded
-
-
-# folders
-
-class Folder:
-    # constr
-
-    def __init__(self, library: Library, meta: Meta):
-        self._library   = library
-        self._path_root = library.paths.root / meta.data["name"]
-        self._path_meta = self._path_root / library.config.folder_meta_json
-        self._meta      = meta
-
-    # prop
-
-    @property
-    def library(self):
-        return self._library
-
-    @property
-    def meta(self):
-        return self._meta
-
-    @property
-    def uid(self):
-        return self.meta.data["uid"]
-
-    @property
-    def name(self):
-        return self.meta.data["name"]
-
-    @property
-    def path_root(self):
-        return self._path_root
-
-    @property
-    def path_meta(self):
-        return self._path_meta
-
-    # sys
-
-    @property
-    def __key(self) -> tuple:
-        return self.library, self.name
-
-    def __hash__(self) -> int:
-        return hash(self.__key)
-
-    def __eq__(self, other: Folder) -> bool:
-        if isinstance(other, Folder):
-            return self.__key == other.__key
-        return NotImplemented
-
-    # noinspection PyProtectedMember
-    def _require_active(self) -> None:
-        self.library._require_active()
-        if self.uid not in self.library._folders.keys():
-            raise RuntimeError(
-                "This Folder instance is no longer active."
-            )
-
-    # meta
-
-    @requires_active
-    def meta_reset(self) -> None:
-        self._meta = self._meta.get_reset()
-        self._meta_write()
-
-    @requires_active
-    def meta_refresh(self) -> None:
-        self._meta = self._meta.get_refreshed(self.path_root)
-        self._meta_write()
-
-    def _meta_write(self) -> None:
-        JSONFile.write(self.path_meta, self.meta.serialize())
-
-    # data
-
-    @requires_active
-    def data_delete(self) -> None:
-        path_data = self.path_meta.parent
-        if (
-                path_data == self.path_root
-                or not path_data.is_relative_to(self.path_root)
-        ):
-            raise ValueError(
-                f"Refusing to delete folder data at {path_data!r} because "
-                f"it is not a dedicated directory inside {self.path_root!r}."
-            )
-
-        if path_data.exists():
-            shutil.rmtree(path_data)
-        # noinspection PyProtectedMember
-        self.library._folders_remove_internal(self)
+from ._util       import FileSystem, Generator, JSONFile, SomePath
+from ._util.state import requires_active
+from .config      import LibraryConfig, LibraryPaths
+from .data        import Meta, Tags
+from .folder      import Folder
 
 
 # library
@@ -197,6 +92,10 @@ class Library:
     # main props
 
     @property
+    def is_active(self) -> bool:
+        return self._is_active
+
+    @property
     def config(self) -> LibraryConfig:
         return self._config
 
@@ -221,18 +120,6 @@ class Library:
         return Tags.combine(*[
             f.meta.data["tags"] for f in self._folders.values()
         ])
-
-    # state
-
-    @property
-    def is_active(self) -> bool:
-        return self._is_active
-
-    def _require_active(self) -> None:
-        if not self.is_active:
-            raise RuntimeError(
-                "This Library instance is no longer active."
-            )
 
     # scanning
 
@@ -446,7 +333,7 @@ class Library:
                 meta.write(path_meta)
 
             # init loaded folder
-            folder = Folder(self, meta)
+            folder = Folder(meta, path_folder, path_meta)
         else:
             # meta does not exist
             if folder_skip_if_missing: return None
@@ -527,7 +414,7 @@ class Library:
         meta.write(path_meta)
 
         # init/add folder to internal list
-        folder = Folder(self, meta)
+        folder = Folder(meta, path_folder, path_meta)
         self._folders_add_internal(
             folder, _recache=_recache
         )
@@ -552,6 +439,12 @@ class Library:
         JSONFile.write(
             self._paths.cached_json, path_strs
         )
+
+    def _require_active(self) -> None:
+        if not self.is_active:
+            raise RuntimeError(
+                "This Library instance is no longer active."
+            )
 
     def _recache(self, *, write_cache_json: bool = True):
         for d in Library._UNCACHE_ON_UPDATE:
