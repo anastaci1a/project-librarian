@@ -257,7 +257,7 @@ class Library:
         self._folders.clear()
 
         folder_names = [
-            d.name for d in os.scandir(self._paths.root)
+            d.name for d in os.scandir(self.paths.root)
             if d.is_dir() and not d.name.startswith(".") # only non-dotfile dirs
         ]
 
