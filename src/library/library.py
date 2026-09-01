@@ -75,8 +75,8 @@ class Folder:
             return self.__key == other.__key
         return NotImplemented
 
+    # noinspection PyProtectedMember
     def _require_active(self) -> None:
-        # noinspection PyProtectedMember
         self.library._require_active()
         if self.uid not in self.library._folders.keys():
             raise RuntimeError(
@@ -344,28 +344,35 @@ class Library:
                     succeeded.append(folder)
         finally:
             if _recache: self._recache()
-
         return set(succeeded)
 
     @requires_active
     def folders_create(
             self, *metas: Meta | None,
             # params:
+            folder_skip_collisions:   bool = False, # overrides all other collision handling
             folder_rename_collisions: bool = True,
             folder_allow_overwrite:   bool = True, # does nothing by default until folder_rename_collisions is disabled
             refresh_meta:             bool = False,
             # sys:
             _recache: bool = True
-    ) -> None:
-        for meta in metas:
-            self._folder_create(
-                meta,
-                folder_rename_collisions=folder_rename_collisions,
-                folder_allow_overwrite=folder_allow_overwrite,
-                refresh_meta=refresh_meta,
-                _recache=False
-            )
-        if _recache: self._recache()
+    ) -> set[Folder]:
+        succeeded: list[Folder] = []
+        try:
+            for meta in metas:
+                folder = self._folder_create(
+                    meta,
+                    folder_skip_collisions=folder_skip_collisions,
+                    folder_rename_collisions=folder_rename_collisions,
+                    folder_allow_overwrite=folder_allow_overwrite,
+                    refresh_meta=refresh_meta,
+                    _recache=False
+                )
+                if folder is not None:
+                    succeeded.append(folder)
+        finally:
+            if _recache: self._recache()
+        return set(succeeded)
 
     @requires_active
     def folders_purge(self) -> None:
@@ -455,6 +462,7 @@ class Library:
                 Meta.create(name=folder_name, uid_generator=self._uid_generate),
 
                 # since no meta exists, renaming is not necessary, and overwrite/refreshing is ok
+                folder_skip_collisions=False,
                 folder_rename_collisions=False,
                 folder_allow_overwrite=True,
                 refresh_meta=True,
@@ -471,12 +479,13 @@ class Library:
     def _folder_create(
             self, meta: Meta | None, *,
             # params:
+            folder_skip_collisions:   bool,
             folder_rename_collisions: bool,
             folder_allow_overwrite:   bool,
             refresh_meta:             bool,
             # sys:
             _recache: bool = True
-    ) -> Folder:
+    ) -> Folder | None:
         # init config
         meta_not_provided = meta is None
         meta = meta or Meta.create(uid_generator=self._uid_generate)
@@ -484,6 +493,8 @@ class Library:
 
         # handle collisions
         if path_folder.is_dir():
+            if folder_skip_collisions:
+                return None
             if folder_rename_collisions:
                 # e.g. "Untitled (3)"
                 name_valid = FileSystem.make_valid_subdir_name(self.paths.root, meta.data["name"])
