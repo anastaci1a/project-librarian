@@ -141,7 +141,7 @@ class Library:
             # sys:
             _recache: bool = True
     ) -> None:
-        self._folders.clear()
+        self.folders_detach(_recache=False)
 
         folder_names = [
             d.name for d in os.scandir(self.paths.root)
@@ -183,6 +183,25 @@ class Library:
     # destructive ops
 
     @requires_active
+    def folders_detach(self, *, _recache: bool = True) -> None:
+        try:
+            for folder in set(self._folders.values()):
+                # noinspection PyProtectedMember
+                folder._deactivate()
+                self._folders.pop(folder.uid)
+        finally:
+            if _recache: self._recache()
+
+    @requires_active
+    def folders_purge(self, *, _recache: bool = True) -> None:
+        try:
+            for folder in set(self._folders.values()):
+                folder.data_delete()
+                self._folders.pop(folder.uid)
+        finally:
+            if _recache: self._recache()
+
+    @requires_active
     def purge_all(self) -> None:
         path_data = self.paths.config_json.parent
         if (
@@ -195,7 +214,7 @@ class Library:
             )
 
         try:
-            self.folders_purge()
+            self.folders_purge(_recache=False)
             if path_data.exists():
                 shutil.rmtree(path_data)
         finally:
@@ -261,11 +280,6 @@ class Library:
             if _recache: self._recache()
         return set(succeeded)
 
-    @requires_active
-    def folders_purge(self) -> None:
-        for folder in set(self._folders.values()):
-            folder.data_delete()
-
     # system folder ops
 
     def _folders_add_internal(
@@ -273,21 +287,35 @@ class Library:
             # sys:
             _recache: bool = True
     ) -> None:
-        self._folders.update({
-            f.meta.data["uid"]: f for f in folders
-            if f not in self._folders
-        })
-        if _recache: self._recache()
+        uids = [folder.uid for folder in folders]
+
+        if len(uids) != len(set(uids)):
+            raise ValueError("Duplicate UIDs in folders being added.")
+
+        collisions = self._folders.keys() & set(uids)
+        if collisions:
+            raise ValueError(f"Folder UIDs already loaded: {collisions!r}")
+
+        self._folders.update(zip(uids, folders))
+
+        if _recache:
+            self._recache()
 
     def _folders_remove_internal(
             self, *folders: Folder,
             # sys:
             _recache: bool = True
     ) -> None:
-        for f in folders:
-            self._folders.pop(
-                f.meta.data["uid"]
-            )
+        uids = {folder.uid for folder in folders}
+
+        invalid = uids - self._folders.keys()
+        if len(invalid) > 0:
+            raise ValueError(f"UIDs of folders to remove are not in library: {invalid!r}")
+
+        for uid in uids:
+            # noinspection PyProtectedMember
+            self._folders.get(uid)._deactivate()
+            self._folders.pop(uid)
         if _recache: self._recache()
 
     def _folder_load(

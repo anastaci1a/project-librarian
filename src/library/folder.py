@@ -52,7 +52,7 @@ class Folder:
 
     @property
     def __key(self) -> tuple:
-        return self.name, self.path_root, self.path_meta
+        return self.uid, self.name, self.path_root, self.path_meta
 
     def __hash__(self) -> int:
         return hash(self.__key)
@@ -67,6 +67,9 @@ class Folder:
             raise RuntimeError(
                 "This Folder instance is no longer active."
             )
+
+    def _deactivate(self) -> None:
+        self._is_active = False
 
     # meta
 
