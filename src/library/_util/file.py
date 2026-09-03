@@ -16,6 +16,9 @@ import sys
 
 type SomePath = str | PathLike[str]
 
+type JSONPrimitive = None | bool | int | float | str
+type JSONValue = JSONPrimitive | list[JSONValue] | dict[str, JSONValue]
+
 
 # generic file/folder utils / data collection
 

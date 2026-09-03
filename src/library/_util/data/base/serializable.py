@@ -7,13 +7,10 @@ from dataclasses import dataclass
 from typing      import Any, ClassVar, NotRequired, Required, Self, TypeGuard, TypedDict, \
                         cast, get_args, get_origin, get_type_hints, override
 
-from ...._util.file import JSONFile, SomePath
+from ...file import JSONFile, JSONValue, SomePath
 
 
 # typing utils
-
-type JSONPrimitive = None | bool | int | float | str
-type JSONValue = JSONPrimitive | list[JSONValue] | dict[str, JSONValue]
 
 def is_jsonvalue(value: Any) -> bool:
     if isinstance(value, None | bool | int | float | str):
