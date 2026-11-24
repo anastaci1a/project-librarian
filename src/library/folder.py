@@ -4,9 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import shutil
-
-from ._util       import JSONFile
+from ._util       import FileSystem, JSONFile
 from ._util.state import requires_active
 from .data        import Meta
 
@@ -34,11 +32,11 @@ class Folder:
 
     @property
     def uid(self):
-        return self.meta.data["uid"]
+        return self.meta.uid
 
     @property
     def name(self):
-        return self.meta.data["name"]
+        return self.meta.name
 
     @property
     def path_root(self):
@@ -57,7 +55,7 @@ class Folder:
     def __hash__(self) -> int:
         return hash(self.__key)
 
-    def __eq__(self, other: Folder) -> bool:
+    def __eq__(self, other: object) -> bool:
         if isinstance(other, Folder):
             return self.__key == other.__key
         return NotImplemented
@@ -91,16 +89,5 @@ class Folder:
 
     @requires_active
     def data_delete(self) -> None:
-        path_data = self.path_meta.parent
-        if (
-                path_data == self.path_root
-                or not path_data.is_relative_to(self.path_root)
-        ):
-            raise ValueError(
-                f"Refusing to delete folder data at {path_data!r} because "
-                f"it is not a dedicated directory inside {self.path_root!r}."
-            )
-
-        if path_data.exists():
-            shutil.rmtree(path_data)
+        FileSystem.remove_data_file(self.path_root, self.path_meta)
         self._is_active = False

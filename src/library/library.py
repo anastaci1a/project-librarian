@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import os
-import shutil
 
+from dataclasses import replace
 from functools import cached_property
 from pathlib   import Path
 
@@ -36,7 +36,7 @@ class Library:
     ):
         self._is_active = False
         self._folders: dict[str, Folder] = {}
-        self._config = config or LibraryConfig.create()
+        self._config = config or LibraryConfig()
         self._paths = self._config.resolve(library_root)
 
         config_was_provided = config is not None
@@ -67,11 +67,11 @@ class Library:
                 self._config = config_found
                 self._paths = self._config.resolve(self._paths.root)
             elif config_allow_overwrite:
-                # delete old config and overwrite
+                # The new config replaces the file we actually read.
                 write_new_config = True
                 to_remove = config_found.resolve(self._paths.root)
-                to_remove.config_json.unlink() # delete old files
-                to_remove.cached_json.unlink(missing_ok=True) # ..
+                if to_remove.cached_json.resolve() != self._paths.config_json.resolve():
+                    to_remove.cached_json.unlink(missing_ok=True)
             else:
                 raise FileExistsError(
                     f"Attempted to create the configuration file "
@@ -118,7 +118,7 @@ class Library:
     @cached_property
     def tags(self) -> Tags:
         return Tags.combine(*[
-            f.meta.data["tags"] for f in self._folders.values()
+            f.meta.tags for f in self._folders.values()
         ])
 
     # scanning
@@ -169,6 +169,8 @@ class Library:
             return
 
         folder_names = JSONFile.read(self.paths.cached_json)
+        if not isinstance(folder_names, list) or not all(isinstance(name, str) for name in folder_names):
+            raise TypeError("Expected a JSON array of folder names in the library cache")
         self.folders_load(
             *folder_names,
 
@@ -203,20 +205,10 @@ class Library:
 
     @requires_active
     def purge_all(self) -> None:
-        path_data = self.paths.config_json.parent
-        if (
-                path_data == self.paths.root
-                or not path_data.is_relative_to(self.paths.root)
-        ):
-            raise ValueError(
-                f"Refusing to purge library data at {path_data!r} because "
-                f"it is not a dedicated directory inside {self.paths.root!r}."
-            )
-
         try:
             self.folders_purge(_recache=False)
-            if path_data.exists():
-                shutil.rmtree(path_data)
+            FileSystem.remove_data_file(self.paths.root, self.paths.cached_json)
+            FileSystem.remove_data_file(self.paths.root, self.paths.config_json)
         finally:
             self._is_active = False
 
@@ -314,8 +306,7 @@ class Library:
 
         for uid in uids:
             # noinspection PyProtectedMember
-            self._folders.get(uid)._deactivate()
-            self._folders.pop(uid)
+            self._folders.pop(uid)._deactivate()
         if _recache: self._recache()
 
     def _folder_load(
@@ -330,8 +321,8 @@ class Library:
             _recache: bool = True
     ) -> Folder | None:
         # init config
-        path_folder = self.paths.root / folder_name
-        path_meta   = path_folder / self.config.folder_meta_json
+        path_folder = self.paths.folder_root(folder_name)
+        path_meta   = self.paths.folder_meta_json(path_folder)
 
         if path_meta.is_file():
             # meta exists
@@ -350,12 +341,12 @@ class Library:
             meta_changed = folder_fill_missing_fields
 
             # fix potential folder/meta name mismatch
-            if meta.data["name"] != folder_name:
-                meta = Meta.create(
-                    **(meta.data | {"name": folder_name})
-                )
+            if meta.name != folder_name:
+                meta = replace(meta, name=folder_name)
                 meta_changed = True
 
+            if meta.uid in self._folders:
+                raise ValueError(f"Folder UID already loaded: {meta.uid!r}")
             # overwrite meta if changed internally
             if meta_changed:
                 meta.write(path_meta)
@@ -404,7 +395,7 @@ class Library:
         # init config
         meta_not_provided = meta is None
         meta = meta or Meta.create(uid_generator=self._uid_generate)
-        path_folder = self.paths.root / meta.data["name"]
+        path_folder = self.paths.folder_root(meta.name)
 
         # handle collisions
         if path_folder.is_dir():
@@ -412,29 +403,29 @@ class Library:
                 return None
             if folder_rename_collisions:
                 # e.g. "Untitled (3)"
-                name_valid = FileSystem.make_valid_subdir_name(self.paths.root, meta.data["name"])
-                meta = Meta.create(
-                    **(meta.data | {"name": name_valid})
-                )
-                path_folder = self.paths.root / meta.data["name"] # (redefine)
+                name_valid = FileSystem.make_valid_subdir_name(self.paths.root, meta.name)
+                meta = replace(meta, name=name_valid)
+                path_folder = self.paths.folder_root(meta.name)
             elif not folder_allow_overwrite:
                 raise FileExistsError(
                     f"Attempted to create the folder "
-                    f"{meta.data["name"]!r} which already exists, "
+                    f"{meta.name!r} which already exists, "
                     f"but folder_rename_collisions and folder_allow_overwrite were disabled."
                 )
 
-        path_meta = path_folder / self.config.folder_meta_json
+        path_meta = self.paths.folder_meta_json(path_folder)
 
         # verify meta nonexistence
         if path_meta.is_file():
             if not folder_allow_overwrite:
                 raise FileExistsError(
                     f"Attempted to create the folder "
-                    f"{meta.data["name"]!r} which already has metadata, "
+                    f"{meta.name!r} which already has metadata, "
                     f"but folder_allow_overwrite was disabled."
                 )
 
+        if meta.uid in self._folders:
+            raise ValueError(f"Folder UID already loaded: {meta.uid!r}")
         # create folder/meta
         FileSystem.resolve_parents(path_meta)
         if refresh_meta or meta_not_provided:

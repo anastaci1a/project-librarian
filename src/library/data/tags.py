@@ -2,9 +2,10 @@
 
 from collections.abc import Mapping
 from types           import MappingProxyType
-from typing          import Any, Self, TypeGuard, override
+from typing          import Any, Self, TypeGuard, cast, override
 
-from .._util.data.base import Serializable, JSONValue
+from .._util.data.serializable import SerializableValue
+from .._util.file import JSONValue
 
 
 # types
@@ -13,7 +14,7 @@ type TagsData       = Mapping[str, frozenset[str]]
 type TagsInput      = Mapping[str, TagValuesInput]
 type TagValuesInput = list[str] | tuple[str, ...] | set[str] | frozenset[str]
 
-def is_tagsinput(value: Any) -> TypeGuard[TagsInput]:
+def is_tagsinput(value: Any, /) -> TypeGuard[TagsInput]:
     return (
         isinstance(value, Mapping)
         and all(
@@ -27,55 +28,31 @@ def is_tagsinput(value: Any) -> TypeGuard[TagsInput]:
 
 # tags
 
-class Tags(Serializable[TagsData]):
-    @override
-    @property
-    def data(self) -> TagsData:
-        return self._data
-
+class Tags(SerializableValue[TagsInput | None, TagsData]):
     @override
     @classmethod
-    def _parse(
-            cls,
-            unparsed: TagsInput | Self | None = None,
-            /,
-            **kwargs: Any
-    ) -> TagsData:
+    def _parse(cls, unparsed: TagsInput | None = None, /) -> TagsData:
         if unparsed is None:
             return MappingProxyType({})
 
-        if is_tagsinput(unparsed):
-            frozen: dict[str, frozenset[str]] = {
-                k: frozenset(v)
-                for k, v in unparsed.items()
-            }
-            return MappingProxyType(frozen)
-
-        return super()._parse(unparsed, **kwargs)
+        if not is_tagsinput(unparsed):
+            raise TypeError("Expected tag names mapped to collections of strings")
+        return MappingProxyType({k: frozenset(v) for k, v in unparsed.items()})
 
     @override
-    def serialize(self, **kwargs: Any) -> JSONValue:
-        unfrozen: dict[str, list[str]] = {
-            k: sorted([s for s in v])
-            for k, v in self.data.items()
-        }
-
-        return unfrozen
+    def serialize(self, /) -> JSONValue:
+        return cast(JSONValue, {k: sorted(v) for k, v in self.data.items()})
 
     # util
 
     @classmethod
-    def combine(
-            cls,
-            *to_combine: TagsInput | Self,
-            **kwargs
-    ) -> Self:
+    def combine(cls, /, *to_combine: TagsInput | Self) -> Self:
         combined: dict[str, set[str]] = {}
 
         for item in to_combine:
-            data = item.data if isinstance(item, cls) else item
+            data = item.data if isinstance(item, Tags) else item
 
             for k, v in data.items():
                 combined.setdefault(k, set()).update(v)
 
-        return cls(combined, **kwargs)
+        return cls(combined)

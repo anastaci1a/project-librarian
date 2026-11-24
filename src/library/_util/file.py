@@ -8,8 +8,8 @@ from pathlib  import Path
 from typing   import Any
 
 import json
-import os
 import sys
+from errno import EEXIST, ENOTEMPTY
 
 
 # const
@@ -23,6 +23,23 @@ type JSONValue = JSONPrimitive | list[JSONValue] | dict[str, JSONValue]
 # generic file/folder utils / data collection
 
 class FileSystem:
+    @staticmethod
+    def remove_data_file(root: Path, file: Path) -> None:
+        root = root.resolve()
+        parent = file.parent.resolve()
+        if parent != root and root not in parent.parents:
+            raise ValueError(f"File is outside {root}: {file}")
+        try:
+            file.unlink()
+        except FileNotFoundError:
+            return
+        if parent != root:
+            try:
+                parent.rmdir()
+            except OSError as error:
+                if error.errno not in (ENOTEMPTY, EEXIST):
+                    raise
+
     @classmethod
     def make_valid_subdir_name(
             cls,

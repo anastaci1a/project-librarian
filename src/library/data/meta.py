@@ -2,55 +2,30 @@
 
 from __future__  import annotations
 
+from dataclasses import dataclass, field, fields, replace
 from datetime import datetime
 from pathlib  import Path
-from typing   import Any, Callable, NotRequired, Self, TypedDict, override
+from typing   import Callable, Self, override
 
 from .tags import TagsInput, Tags
 
 from .._util           import FileSystem, Generator, SerializableDateTime, SerializablePath
-from .._util.data.base import SerializableCollection, JSONValue
-
-
-# data
-
-class MetaData(TypedDict):
-    uid:           str
-    name:          str
-    tags:          Tags
-    date_created:  SerializableDateTime
-    date_modified: SerializableDateTime
-
-    description:   NotRequired[str]
-    path_icon:     NotRequired[SerializablePath]
-
-def _get_meta_args_default(
-        uid_generator: Callable[[], str]
-) -> dict[str, Any]:
-    now = datetime.now()
-
-    return {
-        "uid":  uid_generator(),
-        "name": "Untitled",
-        "tags": {},
-        "date_created": now,
-        "date_modified": now,
-    }
+from .._util.data.serializable import SerializableModel
+from .._util.file import JSONValue
 
 
 # meta
 
-class Meta(SerializableCollection[MetaData]):
-    # data
-    
-    @override
-    @property
-    def data(self) -> MetaData:
-        return self._data.copy()
-    
-    # factory
+@dataclass(frozen=True, kw_only=True)
+class Meta(SerializableModel):
+    uid: str
+    name: str
+    tags: Tags
+    date_created: SerializableDateTime
+    date_modified: SerializableDateTime
+    description: str | None = field(default=None, metadata={"omit_none": True})
+    path_icon: SerializablePath | None = field(default=None, metadata={"omit_none": True})
 
-    @override
     @classmethod
     def create(
             cls,
@@ -64,19 +39,15 @@ class Meta(SerializableCollection[MetaData]):
             path_icon:     str | Path     | None = None,
             uid_generator: Callable[[], str] = Generator.uid_generate
     ) -> Self:
-        kwargs = {
-            "uid":           uid,
-            "name":          name,
-            "description":   description,
-            "tags":          tags,
-            "date_created":  date_created,
-            "date_modified": date_modified if date_modified is not None else date_created,
-            "path_icon":     path_icon
-        }
-
-        return super().create(
-            **kwargs,
-            args_defaults=_get_meta_args_default(uid_generator)
+        created = SerializableDateTime(date_created if date_created is not None else datetime.now())
+        return cls(
+            uid=uid_generator() if uid is None else uid,
+            name="Untitled" if name is None else name,
+            tags=Tags(tags),
+            date_created=created,
+            date_modified=created if date_modified is None else SerializableDateTime(date_modified),
+            description=description,
+            path_icon=None if path_icon is None else SerializablePath(path_icon),
         )
 
     # conversions
@@ -85,7 +56,7 @@ class Meta(SerializableCollection[MetaData]):
     @classmethod
     def deserialize(
             cls,
-            serialized: JSONValue,
+            serialized: JSONValue, /,
             *,
             discard_unknown_fields: bool = True,
             repair_with_defaults:   bool = False,
@@ -94,20 +65,19 @@ class Meta(SerializableCollection[MetaData]):
         if not repair_with_defaults:
             return super().deserialize(
                 serialized,
-                discard_unknown_fields=discard_unknown_fields # passed to SerializableCollection._validate_serialized
+                discard_unknown_fields=discard_unknown_fields
             )
-        serialized = cls._validate_serialized(
-            serialized,
-            discard_unknown_fields=discard_unknown_fields
-        )
-        return cls.create(**serialized, uid_generator=uid_generator)
+        if isinstance(serialized, dict):
+            # Repair null fields as missing; retain unknown keys for strict validation.
+            names = {f.name for f in fields(cls)}
+            serialized = {k: v for k, v in serialized.items() if v is not None or k not in names}
+        fields_to_repair = cls._decode_fields(serialized, discard_unknown_fields=discard_unknown_fields)
+        return cls.create(**fields_to_repair, uid_generator=uid_generator)
 
     # meta-specific
 
     def get_reset(self) -> Self:
-        return self.create(
-            name=self.data["name"]
-        )
+        return self.create(uid=self.uid, name=self.name)
 
     def get_refreshed(self, root: Path) -> Self:
         children = FileSystem.get_children(
@@ -123,15 +93,12 @@ class Meta(SerializableCollection[MetaData]):
             or FileSystem.get_date_modified(root)
         )
 
-        date_created = min(
-            date_modified,
-            FileSystem.get_earliest_date_modified(children) or date_modified,
-            self.data["date_created"].data,
-        )
+        earliest = FileSystem.get_earliest_date_modified(children) or date_modified
+        previous = self.date_created.data
+        if previous.tzinfo is not None:
+            date_modified = date_modified.astimezone(previous.tzinfo)
+            earliest = earliest.astimezone(previous.tzinfo)
+        date_created = min(date_modified, earliest, previous)
 
-        return type(self).create(
-            **(self.data | {
-                "date_created":  date_created,
-                "date_modified": date_modified
-            })
-        )
+        return replace(self, date_created=SerializableDateTime(date_created),
+                       date_modified=SerializableDateTime(date_modified))

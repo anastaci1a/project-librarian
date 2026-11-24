@@ -1,2 +1,3 @@
+typing-extensions
 # pylnk3~=0.4.3
 # pytest~=9.0.3
