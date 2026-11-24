@@ -1,6 +1,6 @@
 # dep
 
-from .base import Serializable
+from .base   import Serializable
 from .models import SerializableValue, SerializableModel
 
 

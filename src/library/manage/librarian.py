@@ -16,6 +16,6 @@ class Librarian:
             cls,
             to_process: Folder | Iterable[Folder] | Library,
             *,
-            map_filetype: dict[str, Tags | TagsInput] = TagMap.FILETYPE_TO_TAGS
+            map_filetype: dict[str, Tags | TagsInput] = TagsMap.FILETYPE_TO_TAGS # TODO
     ):
         pass

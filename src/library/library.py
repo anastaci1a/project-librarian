@@ -1,3 +1,5 @@
+# dep
+
 from __future__ import annotations
 
 import os
@@ -8,6 +10,7 @@ from pathlib   import Path
 
 from ._util       import FileSystem, Generator, JSONFile, SomePath
 from ._util.state import requires_active
+
 from .config      import LibraryConfig, LibraryPaths
 from .data        import Meta, Tags
 from .folder      import Folder

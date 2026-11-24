@@ -3,6 +3,7 @@
 from .data import *
 
 from .config  import LibraryConfig
+from .folder  import Folder
 from .library import Library
 
 
@@ -10,5 +11,6 @@ from .library import Library
 
 __all__ = [
     "LibraryConfig",
+    "Folder",
     "Library"
 ]

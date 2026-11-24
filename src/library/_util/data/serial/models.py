@@ -52,7 +52,9 @@ class SerializableValue[Input, Data](Serializable, ABC):
                 cls._InputType, cls._DataType = args
             else:
                 bindings = dict(zip(parameters, args, strict=True))
+                # noinspection PyProtectedMember
                 cls._InputType = bind_type(parent._InputType, bindings)
+                # noinspection PyProtectedMember
                 cls._DataType = bind_type(parent._DataType, bindings)
             return
         raise TypeError(f"No SerializableValue base found for {cls.__name__}")
@@ -103,6 +105,57 @@ class SerializableValue[Input, Data](Serializable, ABC):
         return ArgParse.is_type(obj, cls._DataType)
 
 
+# model
+
+class SerializableModel(Serializable):
+    # serial
+
+    @override
+    def serialize(self, /) -> dict[str, JSONValue]:
+        if not is_dataclass(self):
+            raise TypeError("SerializableModel subclasses must be dataclasses")
+
+        result = {}
+        # noinspection PyDataclass, PyTypeChecker
+        for f in fields(self):
+            if not f.init:
+                continue
+            value = getattr(self, f.name)
+            if value is not None or not f.metadata.get("omit_none"):
+                result[f.name] = _encode(value)
+
+        return result
+
+    @classmethod
+    @override
+    def deserialize(cls, serialized: JSONValue, /, *, discard_unknown_fields: bool = True) -> Self:
+        # noinspection PyArgumentList
+        return cls(
+            **cls._decode_fields(
+                serialized,
+                discard_unknown_fields=discard_unknown_fields
+            )
+        )
+
+    # util
+
+    @classmethod
+    def _decode_fields(cls, value: JSONValue, /, *, discard_unknown_fields: bool) -> dict[str, Any]:
+        if not is_dataclass(cls) or not isinstance(value, dict):
+            raise TypeError(f"Expected a JSON object for dataclass {cls.__name__}")
+        if not all(isinstance(key, str) for key in value):
+            raise TypeError(f"{cls.__name__} expects string field names")
+
+        hints = get_type_hints(cls)
+        # noinspection PyDataclass, PyTypeChecker
+        names = {f.name for f in fields(cls) if f.init}
+        unknown = value.keys() - names
+
+        if unknown and not discard_unknown_fields:
+            raise TypeError(f"Unknown field(s) for {cls.__name__}: {sorted(unknown)}")
+        return {k: _decode(hints[k], v, f"{cls.__name__}.{k}") for k, v in value.items() if k in names}
+
+
 # model utils
 
 def _encode(value: Any, /) -> JSONValue:
@@ -142,46 +195,3 @@ def _decode(hint: Any, value: JSONValue, path: str, /) -> Any:
     if hint in (str, int, float, bool, type(None)) and type(value) is hint:
         return value
     raise TypeError(f"{path}: expected {hint}, got {value!r}")
-
-
-# model
-
-class SerializableModel(Serializable):
-    # serial
-
-    @override
-    def serialize(self, /) -> dict[str, JSONValue]:
-        if not is_dataclass(self):
-            raise TypeError("SerializableModel subclasses must be dataclasses")
-
-        result = {}
-        for f in fields(self):
-            if not f.init:
-                continue
-            value = getattr(self, f.name)
-            if value is not None or not f.metadata.get("omit_none"):
-                result[f.name] = _encode(value)
-
-        return result
-
-    @classmethod
-    @override
-    def deserialize(cls, serialized: JSONValue, /, *, discard_unknown_fields: bool = True) -> Self:
-        return cls(**cls._decode_fields(serialized, discard_unknown_fields=discard_unknown_fields))
-
-    # util
-
-    @classmethod
-    def _decode_fields(cls, value: JSONValue, /, *, discard_unknown_fields: bool) -> dict[str, Any]:
-        if not is_dataclass(cls) or not isinstance(value, dict):
-            raise TypeError(f"Expected a JSON object for dataclass {cls.__name__}")
-        if not all(isinstance(key, str) for key in value):
-            raise TypeError(f"{cls.__name__} expects string field names")
-
-        hints = get_type_hints(cls)
-        names = {f.name for f in fields(cls) if f.init}
-        unknown = value.keys() - names
-
-        if unknown and not discard_unknown_fields:
-            raise TypeError(f"Unknown field(s) for {cls.__name__}: {sorted(unknown)}")
-        return {k: _decode(hints[k], v, f"{cls.__name__}.{k}") for k, v in value.items() if k in names}

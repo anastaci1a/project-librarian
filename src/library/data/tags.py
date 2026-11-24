@@ -4,8 +4,8 @@ from collections.abc import Mapping
 from types           import MappingProxyType
 from typing          import Any, Self, TypeGuard, cast, override
 
-from .._util.data.serializable import SerializableValue
-from .._util.file import JSONValue
+from .._util.data.serial import SerializableValue
+from .._util.file        import JSONValue
 
 
 # types
@@ -56,3 +56,10 @@ class Tags(SerializableValue[TagsInput | None, TagsData]):
                 combined.setdefault(k, set()).update(v)
 
         return cls(combined)
+
+
+# map of tags
+
+class TagsMap(SerializableValue[dict[str, Tags], dict[str, Tags]]):
+    def serialize(self, /) -> JSONValue:
+        pass

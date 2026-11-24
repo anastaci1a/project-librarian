@@ -5,8 +5,8 @@ from os       import PathLike
 from pathlib  import Path
 from typing   import override
 
-from ..file        import JSONValue
-from .serializable import SerializableValue
+from ..file  import JSONValue
+from .serial import SerializableValue
 
 
 # individual pieces of data

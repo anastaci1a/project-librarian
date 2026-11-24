@@ -1,8 +1,8 @@
 # dep
 
-from library.data  import Meta
 from library._util import JSONFile # only for testing
 
+from library.data  import Meta
 
 # tests
 

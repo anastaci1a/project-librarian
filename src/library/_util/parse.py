@@ -1,25 +1,26 @@
 # dep
 
-from datetime import datetime
 from collections.abc import Mapping
-from os       import PathLike
-from pathlib  import Path
-from types    import UnionType
-from typing   import Any, TypeAliasType, TypeGuard, TypeVar, get_origin, get_args, Union
+from datetime        import datetime
+from os              import PathLike
+from pathlib         import Path
+from types           import UnionType
+from typing          import Any, TypeAliasType, TypeGuard, TypeVar, Union, get_origin, get_args
 
-# noinspection PyUnresolvedReferences
+# noinspection PyProtectedMember, PyUnresolvedReferences
 from typing_extensions import TypeForm
 
 
+# util
+
 def bind_type(hint: Any, bindings: Mapping[Any, Any]) -> Any:
-    """Substitute free parameters in a class, alias, union, or generic expression."""
+    """Substitute free parameters in a class, alias, union, or generic expression"""
     if isinstance(hint, TypeVar):
         return bindings.get(hint, hint)
     parameters = getattr(hint, "__parameters__", ())
     if parameters:
         return hint[tuple(bindings.get(param, param) for param in parameters)]
     return hint
-
 
 def _matches_type(obj: Any, hint: Any, active: set[tuple[int, Any]]) -> bool:
     if hint is Any:
@@ -47,8 +48,10 @@ def _matches_type(obj: Any, hint: Any, active: set[tuple[int, Any]]) -> bool:
     if origin in (UnionType, Union):
         return any(_matches_type(obj, member, active) for member in args)
     if origin in (list, set, frozenset) and len(args) == 1:
+        # noinspection PyTypeChecker
         return isinstance(obj, origin) and all(_matches_type(item, args[0], active) for item in obj)
     if origin in (dict, Mapping) and len(args) == 2:
+        # noinspection PyUnresolvedReferences
         return isinstance(obj, origin) and all(
             _matches_type(key, args[0], active) and _matches_type(value, args[1], active)
             for key, value in obj.items()

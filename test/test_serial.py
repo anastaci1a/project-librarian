@@ -10,7 +10,7 @@ def test_serializable():
         name="Test"
     )
 
-    print(meta.data) # expected: dict[str, JSONValue | Serializable]
+    assert meta.name == "Test"
 
 
 # main
