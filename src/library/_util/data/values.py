@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from pathlib  import Path
-from typing   import override
+from typing   import Self, override
 
 from ..file  import JSONValue, SomePath
 from .serial import SerializableValue
@@ -11,6 +11,10 @@ from .serial import SerializableValue
 # individual pieces of data
 
 class SerializableDateTime(SerializableValue[datetime | str, datetime]):
+    @classmethod
+    def now(cls) -> Self:
+        return cls(datetime.now())
+
     @override
     @classmethod
     def _parse(cls, unparsed: datetime | str, /) -> datetime:

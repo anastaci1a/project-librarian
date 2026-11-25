@@ -1,12 +1,16 @@
 # dep
 
-from library._util.data.serial import *
+from library.data.meta import Meta
 
 
 # test
 
 def test_misc():
-    pass
+    meta = Meta(
+        name="test",
+        tags={}
+    )
+    print(meta)
 
 
 # main

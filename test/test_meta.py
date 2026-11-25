@@ -9,7 +9,7 @@ from library.data  import Meta
 def test_meta():
     print("META TEST")
 
-    meta = Meta.create(tags={"Status": {"Inactive"}})
+    meta = Meta(tags={"Status": {"Inactive"}})
     print("1:", meta)
     # expected: Meta(name="Untitled", ..., tags: Mapping[str, frozenset[str]], ...)
 

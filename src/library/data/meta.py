@@ -1,59 +1,48 @@
 # dep
 
-from __future__  import annotations
-
-from dataclasses import dataclass, field, fields, replace
-from datetime    import datetime
-from pathlib     import Path
-from typing      import Callable, Self, override
+from attrs   import Factory, evolve, field, frozen
+from pathlib import Path
+from typing  import Callable, ClassVar, Self, override
 
 from .._util             import FileSystem, Generator
 from .._util.data        import SerializableDateTime, SerializablePath
 from .._util.data.serial import SerializableModel
-from .._util.file        import JSONValue
+from .._util.file        import JSONValue, SomePath
 
-from .tags import TagsInput, Tags
+from .tags import Tags
+
+
+# meta util
+
+def _optional_path(value: SomePath | SerializablePath | None, /) -> SerializablePath | None:
+    return None if value is None else SerializablePath(value)
 
 
 # meta
 
-@dataclass(frozen=True, kw_only=True)
+@frozen(kw_only=True)
 class Meta(SerializableModel):
-    uid:  str
-    name: str
-    tags: Tags
-    date_created:  SerializableDateTime
-    date_modified: SerializableDateTime
-    description:   str              | None = field(default=None, metadata={"omit_none": True})
-    path_icon:     SerializablePath | None = field(default=None, metadata={"omit_none": True})
+    omit_none: ClassVar[bool] = True
 
-    # init
+    # props
 
-    @classmethod
-    def create(
-            cls,
-            *,
-            uid:           str            | None = None,
-            name:          str            | None = None,
-            description:   str            | None = None,
-            tags:          TagsInput      | None = None,
-            date_created:  str | datetime | None = None,
-            date_modified: str | datetime | None = None,
-            path_icon:     str | Path     | None = None,
-            uid_generator: Callable[[], str] = Generator.uid_generate
-    ) -> Self:
-        created = SerializableDateTime(date_created if date_created is not None else datetime.now())
-        return cls(
-            uid=uid_generator() if uid is None else uid,
-            name="Untitled" if name is None else name,
-            tags=Tags(tags),
-            date_created=created,
-            date_modified=created if date_modified is None else SerializableDateTime(date_modified),
-            description=description,
-            path_icon=None if path_icon is None else SerializablePath(path_icon),
-        )
+    uid:  str  = field(factory=Generator.uid_generate)
+    name: str  = "Untitled"
+    tags: Tags = field(default=None, converter=Tags)
 
-    # conversions
+    date_created: SerializableDateTime = field(
+        factory=SerializableDateTime.now,
+        converter=SerializableDateTime
+    )
+    date_modified: SerializableDateTime = field(
+        default=Factory(lambda self: self.date_created, takes_self=True),
+        converter=SerializableDateTime,
+    )
+
+    description: str              | None = None
+    path_icon:   SerializablePath | None = field(default=None, converter=_optional_path)
+
+    # serial
 
     @override
     @classmethod
@@ -65,22 +54,24 @@ class Meta(SerializableModel):
             repair_with_defaults:   bool = False,
             uid_generator: Callable[[], str] = Generator.uid_generate
     ) -> Self:
-        if not repair_with_defaults:
-            return super().deserialize(
-                serialized,
-                discard_unknown_fields=discard_unknown_fields
-            )
-        if isinstance(serialized, dict):
-            # repair null fields as missing, retain unknown keys for strict validation
-            names = {f.name for f in fields(cls)}
-            serialized = {k: v for k, v in serialized.items() if v is not None or k not in names}
-        fields_to_repair = cls._decode_fields(serialized, discard_unknown_fields=discard_unknown_fields)
-        return cls.create(**fields_to_repair, uid_generator=uid_generator)
+        values = cls._decode_fields(
+            serialized,
+            discard_unknown_fields=discard_unknown_fields,
+            skip_none=repair_with_defaults
+        )
+        if repair_with_defaults:
+            if "uid" not in values:
+                values["uid"] = uid_generator()
+        else:
+            missing = {"uid", "name", "tags", "date_created", "date_modified"} - values.keys()
+            if missing:
+                raise TypeError(f"Missing required metadata fields: {sorted(missing)}")
+        return cls(**values)
 
     # meta-specific
 
     def get_reset(self) -> Self:
-        return self.create(uid=self.uid, name=self.name)
+        return type(self)(uid=self.uid, name=self.name)
 
     def get_refreshed(self, root: Path) -> Self:
         children = FileSystem.get_children(
@@ -103,5 +94,5 @@ class Meta(SerializableModel):
             earliest = earliest.astimezone(previous.tzinfo)
         date_created = min(date_modified, earliest, previous)
 
-        return replace(self, date_created=SerializableDateTime(date_created),
-                       date_modified=SerializableDateTime(date_modified))
+        # noinspection PyTypeChecker
+        return evolve(self, date_created=date_created, date_modified=date_modified)

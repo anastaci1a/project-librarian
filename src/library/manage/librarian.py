@@ -14,8 +14,8 @@ class Librarian:
     @classmethod
     def autodetect_tags(
             cls,
-            to_process: Folder | Iterable[Folder] | Library,
-            *,
-            map_filetype: dict[str, Tags | TagsInput] = TagsMap.FILETYPE_TO_TAGS # TODO
+            to_process: Folder | Iterable[Folder] | Library #,
+            # *,
+            # map_filetype: dict[str, Tags | TagsInput] = TagsMap.FILETYPE_TO_TAGS # TODO
     ):
         pass

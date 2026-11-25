@@ -6,7 +6,7 @@ from library.data import Meta
 # test
 
 def test_serializable():
-    meta = Meta.create(
+    meta = Meta(
         name="Test"
     )
 

@@ -1,13 +1,14 @@
 # dep
 
 from abc         import ABC
-from dataclasses import dataclass, fields, is_dataclass
+from dataclasses import dataclass
+from attrs       import fields, has
 from types       import UnionType, get_original_bases
-from typing      import Any, ClassVar, Self, TypeGuard, cast, get_args, get_origin, get_type_hints, Union, override
+from typing      import Any, ClassVar, Self, TypeGuard, Union, cast, get_args, get_origin, get_type_hints, override
 
-from .base    import Serializable
 from ...file  import JSONValue
 from ...parse import ArgParse, bind_type
+from .base    import Serializable
 
 
 # value
@@ -108,20 +109,22 @@ class SerializableValue[Input, Data](Serializable, ABC):
 # model
 
 class SerializableModel(Serializable):
+    omit_none: ClassVar[bool] = False
+
     # serial
 
     @override
     def serialize(self, /) -> dict[str, JSONValue]:
-        if not is_dataclass(self):
-            raise TypeError("SerializableModel subclasses must be dataclasses")
+        if not has(type(self)):
+            raise TypeError("SerializableModel subclasses must be attrs classes")
 
         result = {}
         # noinspection PyDataclass, PyTypeChecker
-        for f in fields(self):
+        for f in fields(type(self)):
             if not f.init:
                 continue
             value = getattr(self, f.name)
-            if value is not None or not f.metadata.get("omit_none"):
+            if value is not None or not self.omit_none:
                 result[f.name] = _encode(value)
 
         return result
@@ -140,20 +143,23 @@ class SerializableModel(Serializable):
     # util
 
     @classmethod
-    def _decode_fields(cls, value: JSONValue, /, *, discard_unknown_fields: bool) -> dict[str, Any]:
-        if not is_dataclass(cls) or not isinstance(value, dict):
-            raise TypeError(f"Expected a JSON object for dataclass {cls.__name__}")
+    def _decode_fields(cls, value: JSONValue, /, *, discard_unknown_fields: bool, skip_none: bool = False) -> dict[str, Any]:
+        if not has(cls) or not isinstance(value, dict):
+            raise TypeError(f"Expected a JSON object for attrs model {cls.__name__}")
         if not all(isinstance(key, str) for key in value):
             raise TypeError(f"{cls.__name__} expects string field names")
 
         hints = get_type_hints(cls)
         # noinspection PyDataclass, PyTypeChecker
-        names = {f.name for f in fields(cls) if f.init}
-        unknown = value.keys() - names
+        aliases = {f.name: f.alias for f in fields(cls) if f.init}
+        unknown = value.keys() - aliases.keys()
 
         if unknown and not discard_unknown_fields:
             raise TypeError(f"Unknown field(s) for {cls.__name__}: {sorted(unknown)}")
-        return {k: _decode(hints[k], v, f"{cls.__name__}.{k}") for k, v in value.items() if k in names}
+        return {
+            aliases[k]: _decode(hints[k], v, f"{cls.__name__}.{k}")
+            for k, v in value.items() if k in aliases and not (skip_none and v is None)
+        }
 
 
 # model utils

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import os
 
-from dataclasses import dataclass, field
+from attrs       import field, frozen
+from dataclasses import dataclass
 from pathlib     import Path
 
 from ._util             import SomePath
@@ -14,12 +15,12 @@ from ._util.data.serial import SerializableModel
 
 # library config
 
-@dataclass(frozen=True, kw_only=True)
+@frozen(kw_only=True)
 class LibraryConfig(SerializableModel):
-    config_json:      SerializablePath = SerializablePath(".library/config.json")
-    cached_json:      SerializablePath = SerializablePath(".library/cached.json")
-    folder_meta_json: SerializablePath = SerializablePath(".folder/meta.json")
-    folder_uid_len:   int              = field(default=16, compare=False)
+    config_json:      SerializablePath = field(default=SerializablePath(".library/config.json"), converter=SerializablePath)
+    cached_json:      SerializablePath = field(default=SerializablePath(".library/cached.json"), converter=SerializablePath)
+    folder_meta_json: SerializablePath = field(default=SerializablePath(".folder/meta.json"),    converter=SerializablePath)
+    folder_uid_len:   int              = field(default=16, eq=False)
 
     def resolve(self, library_root: SomePath) -> LibraryPaths:
         paths = LibraryPaths(Path(library_root), self)

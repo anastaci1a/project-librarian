@@ -36,7 +36,7 @@ def test_library_modif(lib: Library):
     folder_name = input(f"enter a folder to create... (enter to skip)\n> ")
     if folder_name == "": print("(skipped.)\n"); return
     new_folders = lib.folders_create(
-        Meta.create(
+        Meta(
             name=folder_name,
             tags={"Label": {"Cool Projects"}}
         ),

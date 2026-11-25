@@ -1,10 +1,8 @@
 # dep
 
-from __future__ import annotations
-
 import os
 
-from dataclasses import replace
+from attrs import evolve
 from functools import cached_property
 from pathlib   import Path
 
@@ -345,7 +343,7 @@ class Library:
 
             # fix potential folder/meta name mismatch
             if meta.name != folder_name:
-                meta = replace(meta, name=folder_name)
+                meta = evolve(meta, name=folder_name)
                 meta_changed = True
 
             if meta.uid in self._folders:
@@ -397,7 +395,7 @@ class Library:
     ) -> Folder | None:
         # init config
         meta_not_provided = meta is None
-        meta = meta or Meta.create(uid_generator=self._uid_generate)
+        meta = meta or Meta(uid=self._uid_generate())
         path_folder = self.paths.folder_root(meta.name)
 
         # handle collisions
@@ -407,7 +405,7 @@ class Library:
             if folder_rename_collisions:
                 # e.g. "Untitled (3)"
                 name_valid = FileSystem.make_valid_subdir_name(self.paths.root, meta.name)
-                meta = replace(meta, name=name_valid)
+                meta = evolve(meta, name=name_valid)
                 path_folder = self.paths.folder_root(meta.name)
             elif not folder_allow_overwrite:
                 raise FileExistsError(
