@@ -19,13 +19,15 @@ from .tags import TagsInput, Tags
 
 @dataclass(frozen=True, kw_only=True)
 class Meta(SerializableModel):
-    uid: str
+    uid:  str
     name: str
     tags: Tags
-    date_created: SerializableDateTime
+    date_created:  SerializableDateTime
     date_modified: SerializableDateTime
-    description: str | None = field(default=None, metadata={"omit_none": True})
-    path_icon: SerializablePath | None = field(default=None, metadata={"omit_none": True})
+    description:   str              | None = field(default=None, metadata={"omit_none": True})
+    path_icon:     SerializablePath | None = field(default=None, metadata={"omit_none": True})
+
+    # init
 
     @classmethod
     def create(
@@ -69,7 +71,7 @@ class Meta(SerializableModel):
                 discard_unknown_fields=discard_unknown_fields
             )
         if isinstance(serialized, dict):
-            # Repair null fields as missing; retain unknown keys for strict validation.
+            # repair null fields as missing, retain unknown keys for strict validation
             names = {f.name for f in fields(cls)}
             serialized = {k: v for k, v in serialized.items() if v is not None or k not in names}
         fields_to_repair = cls._decode_fields(serialized, discard_unknown_fields=discard_unknown_fields)

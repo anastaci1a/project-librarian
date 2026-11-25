@@ -42,5 +42,5 @@ class Generator:
         return "".join([
             charset[
                 randint(0, len(charset)-1)
-            ] for i in range(digits)
+            ] for _ in range(digits)
         ])

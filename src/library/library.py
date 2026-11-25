@@ -70,7 +70,7 @@ class Library:
                 self._config = config_found
                 self._paths = self._config.resolve(self._paths.root)
             elif config_allow_overwrite:
-                # The new config replaces the file we actually read.
+                # new config replaces the file actually read
                 write_new_config = True
                 to_remove = config_found.resolve(self._paths.root)
                 if to_remove.cached_json.resolve() != self._paths.config_json.resolve():
@@ -368,7 +368,7 @@ class Library:
 
             # init new folder
             return self._folder_create(
-                Meta.create(name=folder_name, uid_generator=self._uid_generate),
+                Meta(name=folder_name, uid=self._uid_generate()),
 
                 # since no meta exists, renaming is not necessary, and overwrite/refreshing is ok
                 folder_skip_collisions=False,

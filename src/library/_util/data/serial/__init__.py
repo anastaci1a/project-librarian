@@ -1,7 +1,7 @@
 # dep
 
-from .base   import Serializable
-from .models import SerializableValue, SerializableModel
+from .base       import Serializable
+from .structures import SerializableValue, SerializableModel
 
 
 # export

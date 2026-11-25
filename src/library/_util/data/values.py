@@ -1,20 +1,19 @@
 # dep
 
 from datetime import datetime
-from os       import PathLike
 from pathlib  import Path
 from typing   import override
 
-from ..file  import JSONValue
+from ..file  import JSONValue, SomePath
 from .serial import SerializableValue
 
 
 # individual pieces of data
 
-class SerializableDateTime(SerializableValue[str | datetime, datetime]):
+class SerializableDateTime(SerializableValue[datetime | str, datetime]):
     @override
     @classmethod
-    def _parse(cls, unparsed: str | datetime, /) -> datetime:
+    def _parse(cls, unparsed: datetime | str, /) -> datetime:
         if isinstance(unparsed, str):
             return datetime.fromisoformat(unparsed)
         return super()._parse(unparsed)
@@ -23,13 +22,13 @@ class SerializableDateTime(SerializableValue[str | datetime, datetime]):
     def serialize(self, /) -> JSONValue:
         return self._data.isoformat()
 
-class SerializablePath(SerializableValue[str | PathLike, Path]):
+class SerializablePath(SerializableValue[SomePath, Path]):
     def __fspath__(self, /) -> str:
         return str(self._data)
 
     @override
     @classmethod
-    def _parse(cls, unparsed: str | PathLike, /) -> Path:
+    def _parse(cls, unparsed: SomePath, /) -> Path:
         return Path(unparsed)
 
     @override
